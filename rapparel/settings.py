@@ -58,8 +58,8 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 INSTALLED_APPS = [
     'quickcommerce',
-    'semantic_admin',
-    'semantic_forms',
+    # 'semantic_admin',
+    # 'semantic_forms',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -97,6 +97,21 @@ CORS_ALLOW_ALL_ORIGINS = True
 #     "https://example.com",
 #     "https://anotherdomain.com",
 # ]
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = [
+    'GET',
+    'POST',
+    'PUT',
+    'PATCH',
+    'DELETE',
+    'OPTIONS'
+]
+
+CORS_ALLOW_HEADERS = [
+    'content-type',
+    'authorization',
+    'x-csrftoken',
+]
 
 
 MIDDLEWARE = [
@@ -152,6 +167,11 @@ DATABASES = {
         'PASSWORD': 'b5HERho0cIux',   # Your PostgreSQL password
         'HOST': 'ep-jolly-haze-a4k7ak4t-pooler.us-east-1.aws.neon.tech',  # The host address of the database
         'PORT': '5432',               # Default PostgreSQL port (you can adjust if needed)
+         'OPTIONS': {
+            'options': 'endpoint=ep-jolly-haze-a4k7ak4t',   # Use the endpoint ID
+            'sslmode': 'require',                              # Enforce SSL
+        },
+        'CONN_MAX_AGE': 600,  
     }
 }
 

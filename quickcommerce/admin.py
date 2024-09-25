@@ -5,7 +5,7 @@ from django.shortcuts import render
 from django.db.models import Sum, Count
 from django.contrib import messages
 from django.http import HttpResponseRedirect
-
+import requests
 from django.contrib.auth import get_user_model
 from django.utils.safestring import mark_safe
 from django import forms
@@ -14,6 +14,8 @@ from django.urls import reverse, path
 from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 from .models import *
+import pandas as pd
+
 
 # class ProductAdmin(admin.ModelAdmin):
 #     list_display = ('name', 'display_image', 'gallery_link')
@@ -249,6 +251,9 @@ class CouponAdmin(admin.ModelAdmin):
 
 # Custom StoreAdmin to manage the Store model in the admin interface
 class StoreAdmin(admin.ModelAdmin):
+    class Media:
+        js = ('admin/js/hide_api_fields.js',)
+
     list_display = ('name', 'owner_name', 'owner_contact', 'commission_rate', 'is_featured', 'display_brands', 'display_categories')  # Display these fields in the list view
     search_fields = ('name', 'owner_name', 'owner_contact', 'contact_person_name')  # Allow search by store name and owner name
     list_filter = ('is_featured', 'categories', 'brands')
@@ -256,10 +261,10 @@ class StoreAdmin(admin.ModelAdmin):
     # Group fields into sections for better organization
     fieldsets = (
         (None, {
-            'fields': ('name', 'slug', 'display_image', 'inventory_software', 'commission_rate', 'is_featured')
+            'fields': ('name', 'slug', 'display_image','banner_image' ,'inventory_software', 'commission_rate', 'is_featured')
         }),
         ('Assigned Brands and Categories', {
-            'fields': ('display_brands', 'display_categories')  # Read-only display of brands and categories
+            'fields': ('brands', 'categories')  # Horizontal filter for brands and categories, editable by admins
         }),
         ('Address Information', {
             'fields': ('street_address', 'city', 'state', 'pin_code', 'country')
@@ -270,8 +275,11 @@ class StoreAdmin(admin.ModelAdmin):
         ('Contact Information', {
             'fields': ('owner_name', 'owner_contact', 'contact_person_name', 'contact_person_number')
         }),
+         ('API Access Information', {
+            'fields': ('api_access_token', 'api_refresh_token', 'api_token_expiry', 'api_client_id', 'api_client_secret')
+        }),
     )
-    filter_horizontal = ()
+    filter_horizontal = ('brands', 'categories') 
     readonly_fields = ('slug', 'display_brands', 'display_categories')  # Brands and Categories are read-only
     
     # Display brands in a comma-separated format
@@ -283,6 +291,16 @@ class StoreAdmin(admin.ModelAdmin):
     def display_categories(self, obj):
         return ", ".join([category.name for category in obj.categories.all()])
     display_categories.short_description = 'Categories'
+
+
+      # Add custom JavaScript
+
+    def get_readonly_fields(self, request, obj=None):
+        # Check if the user is an admin
+        if request.user.is_superuser or request.user.groups.filter(name='admin').exists():
+            return ('slug',)  # Make only the slug read-only for admins
+        # For other users (e.g., store owners), make brands and categories read-only
+        return ('slug', 'brands', 'categories', 'display_brands', 'display_categories')
 
     def get_model_perms(self, request):
         # If the user is a store owner, don't show this model in the navigation
@@ -320,6 +338,17 @@ class StoreAdmin(admin.ModelAdmin):
         else:
             extra_context['title'] = 'Edit Store Details'
         return super().change_view(request, object_id, form_url, extra_context=extra_context)
+    
+    def clean(self):
+        # Ensure 'Excel' is compared case-insensitively
+        if self.inventory_software and self.inventory_software.lower() != 'excel':
+            if not self.api_access_token or not self.api_client_id or not self.api_client_secret:
+                raise ValidationError("API fields are required when inventory software is not 'Excel'.")
+    
+    # Override save_model to call the clean method
+    def save_model(self, request, obj, form, change):
+        obj.clean()  # Call the clean method to trigger validation
+        super().save_model(request, obj, form, change)
 
     # Prevent store owners from adding new stores
     def has_add_permission(self, request):
@@ -339,6 +368,8 @@ class StoreAdmin(admin.ModelAdmin):
             if obj and obj.owner_name != request.user:
                 return False  # Store owners can only view stores they own
         return True  # Admins can change any store
+    
+    
 
 # Inline admin for AttributeValue, allowing them to be edited within the Attribute admin view
 class AttributeValueInline(admin.TabularInline):
@@ -369,11 +400,11 @@ class AttributeAdmin(admin.ModelAdmin):
 
 # Custom admin view for Category
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'parent', 'created_at', 'updated_at')  # Display name, logo, parent, and timestamps
+    list_display = ('name', 'parent', 'display_logo','created_at', 'updated_at')  # Display name, logo, parent, and timestamps
     search_fields = ('name',)  # Allow search by category name
     list_filter = ('parent',)  # Allow filtering by parent category
     readonly_fields = ('created_at', 'updated_at')  # Make timestamps read-only
-    fields = ('name', 'description', 'parent', 'created_at', 'updated_at')  # Show fields in form
+    fields = ('name', 'logo','description', 'parent', 'created_at', 'updated_at')  # Show fields in form
 
     # Override get_model_perms to hide this model from Store Owners
     def get_model_perms(self, request):
@@ -381,13 +412,19 @@ class CategoryAdmin(admin.ModelAdmin):
         if request.user.groups.filter(name='Store Owner').exists() or request.user.groups.filter(name='Customer').exists():
             return {}  # Empty perms hide the model
         return super().get_model_perms(request)
+    def display_logo(self, obj):
+        if obj.logo:
+            return format_html('<img src="{}" width="50" height="50" style="object-fit: cover;" />', obj.logo.url)
+        return "No Logo"
+    
+    display_logo.short_description = 'Logo'
 
 # Custom admin view for Brand
 class BrandAdmin(admin.ModelAdmin):
     list_display = ('name', 'display_logo', 'created_at', 'updated_at')  # Display name, logo, and timestamps
     search_fields = ('name',)  # Allow search by brand name
     readonly_fields = ('created_at', 'updated_at')  # Make timestamps read-only
-    fields = ('name', 'logo', 'description', 'created_at', 'updated_at')  # Show fields in form
+    fields = ('name', 'logo' ,'description', 'created_at', 'updated_at')  # Show fields in form
     
     # Override get_model_perms to hide this model from Store Owners
     def get_model_perms(self, request):
@@ -423,6 +460,17 @@ class ProductImageInline(admin.TabularInline):
         if commit:
             instance.save()
         return instance
+    
+class ProductUploadForm(forms.Form):
+    excel_file = forms.FileField()
+
+
+class ProductSelectionForm(forms.Form):
+    selected_products = forms.MultipleChoiceField(
+        widget=forms.CheckboxSelectMultiple,
+        required=False
+    )
+
 
 # Admin view for Product
 class ProductAdmin(admin.ModelAdmin):
@@ -441,33 +489,124 @@ class ProductAdmin(admin.ModelAdmin):
             return qs.filter(store__owner_name=request.user)
         return qs
 
-    # Restrict form so store owners can only add/edit products for their own store
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
         if request.user.groups.filter(name='Store Owner').exists():
             owned_stores = Store.objects.filter(owner_name=request.user)
-
-            # Filter categories and brands associated with the store owner
             form.base_fields['category'].queryset = Category.objects.filter(stores__in=owned_stores).distinct()
             form.base_fields['brand'].queryset = Brand.objects.filter(stores__in=owned_stores).distinct()
-
-            # Also filter the store field to only show the stores owned by the store owner
             form.base_fields['store'].queryset = owned_stores
-            
         return form
 
-    # Hide the store field from the store owner (auto-assign their store)
-    # def get_readonly_fields(self, request, obj=None):
-    #     readonly_fields = list(super().get_readonly_fields(request, obj))
-    #     if request.user.groups.filter(name='Store Owner').exists():
-    #         readonly_fields.append('store')  # Store owner can't change this field
-    #     return readonly_fields
-
-    # Automatically set the store when a product is being created by a store owner
     def save_model(self, request, obj, form, change):
         if request.user.groups.filter(name='Store Owner').exists() and not change:
-            obj.store = Store.objects.get(owner_name=request.user)  # Automatically assign store
+            obj.store = Store.objects.get(owner_name=request.user)
         obj.save()
+
+    # Custom URL to handle the bulk upload
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('upload-products/', self.upload_products, name='upload_products'),
+        ]
+        return custom_urls + urls
+
+    def upload_products(self, request):
+        if request.method == 'POST':
+            form = ProductUploadForm(request.POST, request.FILES)
+            if form.is_valid():
+                excel_file = request.FILES['excel_file']
+                df = pd.read_excel(excel_file)
+
+                # Example Excel column mappings
+                for index, row in df.iterrows():
+                    product = Product(
+                        name=row['Name'],
+                        slug=row['Slug'],
+                        description=row['Description'],
+                        mrp=row['MRP'],
+                        sale_price=row['Sale Price'],
+                        store=Store.objects.get(name=row['Store']),
+                        category=Category.objects.get(name=row['Category']),
+                        brand=Brand.objects.get(name=row['Brand'])
+                    )
+                    product.save()
+
+                messages.success(request, "Products uploaded successfully!")
+                return redirect('..')
+
+        form = ProductUploadForm()
+        return render(request, 'admin/product_upload.html', {'form': form})
+
+
+    def fetch_api_data(self, request):
+        store = Store.objects.get(owner_name=request.user)
+        products_data = []
+        if store.inventory_software == 'Unicommerce':
+            url = 'https://unicommerce.api.endpoint/v1/products'
+            headers = {'Authorization': f'Bearer {store.api_access_token}'}
+        elif store.inventory_software == 'SAP HANA':
+            url = 'https://api.sap.com/sap/opu/odata/sap/API_PRODUCT_SRV/ProductCollection'
+            headers = {'Authorization': f'Bearer {store.api_access_token}'}
+        elif store.inventory_software == 'Logic ERP':
+            url = 'https://logicerp.api.endpoint/getProducts'
+            headers = {'Authorization': f'Bearer {store.api_access_token}'}
+        else:
+            messages.error(request, "Unsupported Inventory Software.")
+            return redirect('..')
+
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            products_data = response.json()
+
+        # Show product data with options to save or discard
+        if request.method == "POST":
+            form = ProductSelectionForm(request.POST)
+            if 'save_selected' in request.POST:
+                selected_ids = form.cleaned_data['selected_products']
+                selected_products = [p for p in products_data if str(p['id']) in selected_ids]
+
+                for product in selected_products:
+                    Product.objects.create(
+                        name=product['name'],
+                        slug=product['slug'],
+                        description=product['description'],
+                        mrp=product['mrp'],
+                        sale_price=product['sale_price'],
+                        category=Category.objects.get(name=product['category']),
+                        brand=Brand.objects.get(name=product['brand']),
+                        store=store
+                    )
+
+                messages.success(request, "Selected products saved successfully!")
+            elif 'discard_all' in request.POST:
+                messages.info(request, "All fetched products discarded.")
+            return redirect('..')
+
+        form = ProductSelectionForm(initial={'selected_products': [(p['id'], p['name']) for p in products_data]})
+
+        return render(request, 'admin/select_products.html', {
+            'form': form,
+            'products_data': products_data
+        })
+    #  Customize Admin Interface
+    change_list_template = "admin/product_changelist.html"
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+
+        # If the POST request is for fetching data
+        if request.method == "POST" and 'fetch_data' in request.POST:
+            return self.fetch_api_data(request)
+
+        # Proceed with the default changelist view
+        return super().changelist_view(request, extra_context=extra_context)
+
+
+
+    
+        
+        
 
     def display_image(self, obj):
         if obj.image:

@@ -13,6 +13,7 @@ from django.urls import reverse
 User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
+    # Handle group assignments via SlugRelatedField
     groups = serializers.SlugRelatedField(
         many=True,
         slug_field='name',
@@ -21,17 +22,42 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'phone_number', 'total_amount_spent', 'last_login', 'date_joined', 'groups']
+        fields = ['id', 'username', 'email', 'phone_number', 'password', 'total_amount_spent', 'last_login', 'date_joined', 'groups']
         extra_kwargs = {'password': {'write_only': True}}
 
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("A user with this username already exists.")
+        return value
+
+    def validate_phone_number(self, value):
+        if User.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError("A user with this phone number already exists.")
+        return value
+
     def create(self, validated_data):
+        # Pop the groups field from validated_data
+        groups_data = validated_data.pop('groups', None)
+
+        # Create the user with necessary details
         user = User.objects.create_user(
             email=validated_data['email'],
             username=validated_data['username'],
             phone_number=validated_data['phone_number'],
             password=validated_data['password'],
-            is_active=False  # Set user as inactive until email is verified
+            is_active=False  # User will be inactive until email verification
         )
+
+        # If groups were provided, assign them to the user
+        if groups_data:
+            for group in groups_data:
+                user.groups.add(group)
+
         return user
 
 class CategorySerializer(serializers.ModelSerializer):

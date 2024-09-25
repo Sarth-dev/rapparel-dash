@@ -1,0 +1,160 @@
+{% extends 'base_auth.html' %}
+
+{% block title %}Create Account | Rapparel {% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <h4 class="text-center mb-4">Create an account</h4>
+    <p class="text-center text-muted mb-4">Enter your details to sign up for this app</p>
+
+    <form id="registerForm" method="post" action="{% url 'signup' %}">
+        {% csrf_token %}
+        
+        <!-- Full Name Input -->
+        <div class="mb-3">
+            <input type="text" id="fullName" name="full_name" class="form-control" placeholder="Full Name" required>
+            <div class="invalid-feedback" id="fullNameError"></div>
+        </div>
+
+        <!-- Email Input -->
+        <div class="mb-3">
+            <input type="email" id="email" name="email" class="form-control" placeholder="Email" required>
+            <div class="invalid-feedback" id="emailError"></div>
+        </div>
+
+        <!-- Phone Number Input -->
+        <div class="mb-3">
+            <input type="text" id="phoneNumber" name="phone_number" class="form-control" placeholder="Phone Number" required>
+            <div class="invalid-feedback" id="phoneNumberError"></div>
+        </div>
+
+        <!-- Password Input -->
+        <div class="password-field mb-3">
+            <input type="password" id="password" name="password" class="form-control" placeholder="Password" required>
+            <span class="input-group-text" onclick="togglePassword()">
+                <i class="bi bi-eye" id="togglePasswordIcon"></i>
+            </span>
+            <div class="invalid-feedback" id="passwordError"></div>
+        </div>
+
+        <!-- Confirm Password Input -->
+        <div class="mb-3">
+            <input type="password" id="confirmPassword" name="confirm_password" class="form-control" placeholder="Confirm Password" required>
+            <div class="invalid-feedback" id="confirmPasswordError"></div>
+        </div>
+
+        <!-- Checkbox for Terms & Conditions -->
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="terms" required>
+            <label class="form-check-label" for="terms">
+                I agree to Rapportal's <a href="#">Terms of Service</a>, <a href="#">Privacy Policy</a> and <a href="#">Content Policies</a>
+            </label>
+            <div class="invalid-feedback" id="termsError">You must agree to the terms.</div>
+        </div>
+
+        <!-- Create Account Button -->
+        <button type="submit" class="btn btn-primary w-100 mb-3">Create Account</button>
+    </form>
+
+    <!-- Already have an account -->
+    <p class="text-center">
+        Already have an account? <a href="/login" class="text-danger">Login</a>
+    </p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // JavaScript logic for form validation and password toggle
+
+    document.getElementById("registerForm").addEventListener("submit", function(event) {
+        event.preventDefault(); // Prevent form submission for validation
+
+        // Clear previous errors
+        clearErrors();
+
+        let isValid = true;
+
+        // Validate Full Name
+        const fullName = document.getElementById("fullName").value;
+        if (fullName.length < 3) {
+            isValid = false;
+            displayError("fullNameError", "Full Name must be at least 3 characters long.");
+        }
+
+        // Validate Email
+        const email = document.getElementById("email").value;
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(email)) {
+            isValid = false;
+            displayError("emailError", "Please enter a valid email address.");
+        }
+
+        // Validate Phone Number
+        const phoneNumber = document.getElementById("phoneNumber").value;
+        const phonePattern = /^[0-9]{10,15}$/;
+        if (!phonePattern.test(phoneNumber)) {
+            isValid = false;
+            displayError("phoneNumberError", "Please enter a valid phone number (10-15 digits).");
+        }
+
+        // Validate Password
+        const password = document.getElementById("password").value;
+        const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+        if (!passwordPattern.test(password)) {
+            isValid = false;
+            displayError("passwordError", "Password must be at least 8 characters long, contain one uppercase letter, one lowercase letter, one number, and one special character.");
+        }
+
+        // Validate Confirm Password
+        const confirmPassword = document.getElementById("confirmPassword").value;
+        if (password !== confirmPassword) {
+            isValid = false;
+            displayError("confirmPasswordError", "Passwords do not match.");
+        }
+
+        // Validate Terms & Conditions
+        const terms = document.getElementById("terms").checked;
+        if (!terms) {
+            isValid = false;
+            displayError("termsError", "You must agree to the terms.");
+        }
+
+        // If all validations pass, submit the form
+        if (isValid) {
+            document.getElementById("registerForm").submit();
+        }
+    });
+
+    function clearErrors() {
+        document.getElementById("fullNameError").textContent = "";
+        document.getElementById("emailError").textContent = "";
+        document.getElementById("phoneNumberError").textContent = "";
+        document.getElementById("passwordError").textContent = "";
+        document.getElementById("confirmPasswordError").textContent = "";
+        document.getElementById("termsError").textContent = "";
+    }
+
+    function displayError(elementId, errorMessage) {
+        document.getElementById(elementId).textContent = errorMessage;
+    }
+
+    function togglePassword() {
+        const passwordField = document.getElementById('password');
+        const confirmpasswordField = document.getElementById('confirmPassword');
+        const toggleIcon = document.getElementById('togglePasswordIcon');
+
+        if (passwordField.type === 'password' && confirmpasswordField.type === 'password') {
+            passwordField.type = 'text';
+            confirmpasswordField.type = 'text';
+            toggleIcon.classList.remove('bi-eye');
+            toggleIcon.classList.add('bi-eye-slash');
+        } else {
+            passwordField.type = 'password';
+            confirmpasswordField.type = 'password';
+            toggleIcon.classList.remove('bi-eye-slash');
+            toggleIcon.classList.add('bi-eye');
+        }
+    }
+</script>
+{% endblock %}

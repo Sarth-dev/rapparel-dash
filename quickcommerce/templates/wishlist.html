@@ -1,0 +1,35 @@
+{% extends 'base_index.html' %}
+
+{% block content %}
+<h1>My Wishlist</h1>
+<ul>
+    {% for item in wishlist %}
+    <li>
+        <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}" width="100">
+        <a href="{% url 'product_detail' item.product.slug %}">{{ item.product.name }}</a>
+        <button onclick="removeFromWishlist('{{ item.product.slug }}')">Remove</button>
+    </li>
+    {% empty %}
+    <li>No items in your wishlist.</li>
+    {% endfor %}
+</ul>
+
+<script>
+    function removeFromWishlist(productSlug) {
+        fetch(`/wishlist/remove/${productSlug}/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => {
+            if (response.status === 204) {
+                alert('Removed from wishlist');
+                location.reload();
+            } else {
+                alert('Failed to remove from wishlist');
+            }
+        });
+    }
+</script>
+{% endblock %}

@@ -3,11 +3,11 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .permissions import IsAdminUser, IsManagerUser, IsStaffUser
 from rest_framework.parsers import MultiPartParser, FormParser
-from django.contrib.auth.forms import PasswordResetForm
+from .forms import PasswordResetForm
 
 from rest_framework import status, generics,serializers
 from django.db.models import Sum, F
-from .models import Banner,Coupon ,Inventory,ReturnRequest,Product,ProductImage, Category, Brand, Cart, CartItem, Order, Wishlist, Address, User, OrderItem, Store
+from .models import Banner,Coupon ,Inventory,ReturnRequest,Product,ProductImage, Category, Brand, Cart, CartItem, Order, Wishlist, Address, User, OrderItem, Store, Attribute
 from .serializers import (
     BannerSerializer, ProductSerializer, CategorySerializer, BrandSerializer,
     CartSerializer, CartItemSerializer, OrderSerializer, WishlistSerializer, 
@@ -21,14 +21,25 @@ from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect
 from django.conf import settings
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.utils.http import urlsafe_base64_encode,urlsafe_base64_decode
 from django.utils.encoding import force_bytes,force_str
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, AnonymousUser
 from django.contrib.auth import get_user_model
+
+from django.contrib import messages
+from django.contrib.sites.shortcuts import get_current_site
 from django.views.decorators.csrf import csrf_exempt
+from django.views.generic.edit import FormView
+from django.views.generic import TemplateView
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.views import View
+from django.views.decorators.http import require_GET
+
+
+
 
 from django.contrib.auth.tokens import PasswordResetTokenGenerator, default_token_generator
 from django.core.files.storage import default_storage
@@ -36,107 +47,235 @@ from django.core.files.base import ContentFile
 import pandas as pd
 
 
-User = get_user_model()  #custom user model 
-#home page
-class LandingPageView(APIView):
-    permission_classes = [IsAuthenticated]
+# #home page
+# class LandingPageView(APIView):
+#     permission_classes = [AllowAny]
 
-    def get(self, request, *args, **kwargs):
-        # Fetch banners, categories, and brands
-        banners = Banner.objects.filter(is_active=True)
+#     def get(self, request, *args, **kwargs):
+#         # Fetch banners, categories, and brands
+#         banners = Banner.objects.filter(is_active=True)
+#         categories = Category.objects.all()
+#         brands = Brand.objects.all()
+
+#         banners_serializer = BannerSerializer(banners, many=True)
+#         categories_serializer = CategorySerializer(categories, many=True)
+#         brands_serializer = BrandSerializer(brands, many=True)
+
+#         # Initialize variables
+#         address = None
+#         nearby_stores = []
+#         saved_addresses = []
+#         featured_stores = []
+
+#         # Check if the user is authenticated and fetch saved addresses
+#         user = request.user
+#         if user.is_authenticated:
+#             saved_addresses = Address.objects.filter(user=user, is_default=True)
+#             if saved_addresses.exists():
+#                 user_address = saved_addresses.first()
+#                 address_location = f"{user_address.street_address}, {user_address.city}, {user_address.state}, {user_address.country}"
+#                 geolocator = Nominatim(user_agent="quick-commerce-app")
+#                 location = geolocator.reverse(address_location)
+#                 address = location.address if location else address_location
+
+#                 # Convert user's saved address to a tuple (latitude, longitude)
+#                 user_coords = (user_address.latitude, user_address.longitude)
+#             else:
+#                 address = "No saved address found."
+
+#         # Check if real-time location is provided in the query parameters
+#         latitude = request.query_params.get('latitude')
+#         longitude = request.query_params.get('longitude')
+#         if latitude and longitude:
+#             user_coords = (float(latitude), float(longitude))
+#             geolocator = Nominatim(user_agent="quick-commerce-app")
+#             location = geolocator.reverse(user_coords, exactly_one=True)
+#             address = location.address if location else "Location address not found"
+#             # Find nearby stores based on coordinates
+#             stores = Store.objects.all()
+#             store_distances = []
+#             for store in stores:
+#                 store_coords = (store.latitude, store.longitude)
+#                 distance = geodesic(user_coords, store_coords).kilometers
+#                 store_distances.append((store, distance))
+#             store_distances.sort(key=lambda x: x[1])
+#             nearby_stores = [store[0] for store in store_distances[:12]]
+#         else:
+#             # No real-time location provided, fetch featured stores
+#             featured_stores = Store.objects.filter(is_featured=True).order_by('-id')[:12]
+        
+#         # Serialize the store data
+#         stores_serializer = StoreSerializer(nearby_stores if latitude and longitude else featured_stores, many=True)
+
+#         data = {
+#             'banners': banners_serializer.data,
+#             'categories': categories_serializer.data,
+#             'brands': brands_serializer.data,
+#             'user_address': address,
+#             'saved_addresses': [f"{addr.street_address}, {addr.city}, {addr.state}, {addr.country}" for addr in saved_addresses],
+#             'nearby_stores': stores_serializer.data,
+#         }
+#         return Response(data, status=200)
+
+class LandingPageView(TemplateView):
+    template_name = "landing_page.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Fetch banners based on 'place'
+        primary_banner = Banner.objects.filter(is_active=True, place='primary').first()
+        secondary_banners = Banner.objects.filter(is_active=True, place__in=['secondary_one', 'secondary_two', 'secondary_three'])
+
+        # Fetch categories and brands
         categories = Category.objects.all()
         brands = Brand.objects.all()
-
-        banners_serializer = BannerSerializer(banners, many=True)
-        categories_serializer = CategorySerializer(categories, many=True)
-        brands_serializer = BrandSerializer(brands, many=True)
 
         # Initialize variables
         address = None
         nearby_stores = []
         saved_addresses = []
         featured_stores = []
+        user_coords = None  # Initialize variable for user's coordinates
 
         # Check if the user is authenticated and fetch saved addresses
-        user = request.user
+        user = self.request.user
         if user.is_authenticated:
-            saved_addresses = Address.objects.filter(user=user, is_default=True)
-            if saved_addresses.exists():
-                user_address = saved_addresses.first()
-                address_location = f"{user_address.street_address}, {user_address.city}, {user_address.state}, {user_address.country}"
-                geolocator = Nominatim(user_agent="quick-commerce-app")
-                location = geolocator.reverse(address_location)
-                address = location.address if location else address_location
+            saved_addresses = Address.objects.filter(user=user)  # Fetch all addresses, not just default
 
-                # Convert user's saved address to a tuple (latitude, longitude)
-                user_coords = (user_address.latitude, user_address.longitude)
-            else:
-                address = "No saved address found."
+            # If the user has default address, use it
+            if saved_addresses.exists():
+                default_address = saved_addresses.filter(is_default=True).first()
+                if default_address:
+                    user_coords = (default_address.latitude, default_address.longitude)
+                    address = f"{default_address.street_address}, {default_address.city}, {default_address.state}, {default_address.country}"
+                else:
+                    address = "No default address found."
 
         # Check if real-time location is provided in the query parameters
-        latitude = request.query_params.get('latitude')
-        longitude = request.query_params.get('longitude')
+        latitude = self.request.GET.get('latitude')
+        longitude = self.request.GET.get('longitude')
+
+        # Override the saved address with real-time location if provided
         if latitude and longitude:
             user_coords = (float(latitude), float(longitude))
             geolocator = Nominatim(user_agent="quick-commerce-app")
             location = geolocator.reverse(user_coords, exactly_one=True)
             address = location.address if location else "Location address not found"
-            # Find nearby stores based on coordinates
+        
+        # Fetch nearby stores based on coordinates
+        if user_coords:
             stores = Store.objects.all()
             store_distances = []
             for store in stores:
                 store_coords = (store.latitude, store.longitude)
                 distance = geodesic(user_coords, store_coords).kilometers
                 store_distances.append((store, distance))
-            store_distances.sort(key=lambda x: x[1])
+            store_distances.sort(key=lambda x: x[1])  # Sort stores by distance
             nearby_stores = [store[0] for store in store_distances[:12]]
         else:
-            # No real-time location provided, fetch featured stores
+            # No location provided, fetch featured stores
             featured_stores = Store.objects.filter(is_featured=True).order_by('-id')[:12]
-        
-        # Serialize the store data
-        stores_serializer = StoreSerializer(nearby_stores if latitude and longitude else featured_stores, many=True)
 
-        data = {
-            'banners': banners_serializer.data,
-            'categories': categories_serializer.data,
-            'brands': brands_serializer.data,
-            'user_address': address,
-            'saved_addresses': [f"{addr.street_address}, {addr.city}, {addr.state}, {addr.country}" for addr in saved_addresses],
-            'nearby_stores': stores_serializer.data,
-        }
-        return Response(data, status=200)
+        # Add serialized data to context
+        context['primary_banner'] = primary_banner
+        context['secondary_banners'] = secondary_banners
+        context['categories'] = categories
+        context['brands'] = brands
+        context['user_address'] = address
+        context['saved_addresses'] = list(saved_addresses)
+        context['nearby_stores'] = nearby_stores if user_coords else featured_stores
 
-
-#when clicked on category this view will be rendered...
-class CategoryStoresView(APIView):
-    def get(self, request, *args, **kwargs):
-        category_id = request.query_params.get('category')
-        latitude = request.query_params.get('latitude')
-        longitude = request.query_params.get('longitude')
-        user_address_id = request.query_params.get('address_id')
+        return context
+    
 
 
-        # Validate category ID
-        if not category_id:
-            return Response({'error': 'Category ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
+def fetch_saved_addresses(request):
+    # Ensure the user is authenticated
+    if request.user.is_authenticated:
+        saved_addresses = Address.objects.filter(user=request.user).values(
+            'id', 'street_address', 'city', 'state', 'country', 'latitude', 'longitude'
+        )
+        return JsonResponse(list(saved_addresses), safe=False)
+    else:
+        return JsonResponse([], safe=False)
 
-        try:
-            category = Category.objects.get(id=category_id)
-        except Category.DoesNotExist:
-            return Response({'error': 'Category not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+# #when clicked on category this view will be rendered...
+# class CategoryStoresView(APIView):
+#     permission_classes = [AllowAny]
+
+#     def get(self, request, *args, **kwargs):
+#         category_id = request.query_params.get('category')
+#         latitude = request.query_params.get('latitude')
+#         longitude = request.query_params.get('longitude')
+#         user_address_id = request.query_params.get('address_id')
+
+
+#         # Validate category ID
+#         if not category_id:
+#             return Response({'error': 'Category ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+#         try:
+#             category = Category.objects.get(id=category_id)
+#         except Category.DoesNotExist:
+#             return Response({'error': 'Category not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+#         user_coords = None
+#         if latitude and longitude:
+#             user_coords = (float(latitude), float(longitude))
+#         elif user_address_id:
+#             try:
+#                 address = Address.objects.get(id=user_address_id)
+#                 user_coords = (address.latitude, address.longitude)
+#             except Address.DoesNotExist:
+#                 return Response({'error': 'Address not found.'}, status=status.HTTP_404_NOT_FOUND)
+#         else:
+#             return Response({'error': 'Latitude and longitude are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+#         # Fetch stores that belong to the category
+#         stores = Store.objects.filter(categories=category)
+
+#         # Calculate distances and sort by proximity
+#         store_distances = []
+#         for store in stores:
+#             store_coords = (store.latitude, store.longitude)
+#             distance = geodesic(user_coords, store_coords).kilometers
+#             store_distances.append((store, distance))
+
+#         store_distances.sort(key=lambda x: x[1])
+#         nearby_stores = [store[0] for store in store_distances]
+
+#         # Serialize the store data
+#         stores_serializer = StoreSerializer(nearby_stores, many=True)
+
+#         data = {
+#             'category': category.name,
+#             'nearby_stores': stores_serializer.data,
+#         }
+#         return Response(data, status=status.HTTP_200_OK)
+
+
+class CategoryStoresView(View):
+    def get(self, request, category_slug, *args, **kwargs):
+        latitude = request.GET.get('latitude')
+        longitude = request.GET.get('longitude')
+        user_address_id = request.GET.get('address_id')
+
+        # Fetch the category using the name
+        category = get_object_or_404(Category, slug=category_slug)
 
         user_coords = None
         if latitude and longitude:
-            user_coords = (float(latitude), float(longitude))
-        elif user_address_id:
             try:
-                address = Address.objects.get(id=user_address_id)
-                user_coords = (address.latitude, address.longitude)
-            except Address.DoesNotExist:
-                return Response({'error': 'Address not found.'}, status=status.HTTP_404_NOT_FOUND)
+                user_coords = (float(latitude), float(longitude))
+            except ValueError:
+                return HttpResponseBadRequest('Invalid latitude or longitude format.')
+        elif user_address_id:
+            address = get_object_or_404(Address, id=user_address_id)
+            user_coords = (address.latitude, address.longitude)
         else:
-            return Response({'error': 'Latitude and longitude are required.'}, status=status.HTTP_400_BAD_REQUEST)
+            return HttpResponseBadRequest('Latitude and longitude or address ID is required.')
 
         # Fetch stores that belong to the category
         stores = Store.objects.filter(categories=category)
@@ -151,48 +290,111 @@ class CategoryStoresView(APIView):
         store_distances.sort(key=lambda x: x[1])
         nearby_stores = [store[0] for store in store_distances]
 
-        # Serialize the store data
-        stores_serializer = StoreSerializer(nearby_stores, many=True)
-
-        data = {
-            'category': category.name,
-            'nearby_stores': stores_serializer.data,
+        # Pass the category and stores data to the template
+        context = {
+            'category_name': category.name,
+            'nearby_stores': nearby_stores,
         }
-        return Response(data, status=status.HTTP_200_OK)
 
-#when clicked on brand this will be rendered
-class BrandStoresView(APIView):
-    def get(self, request, *args, **kwargs):
-        brand_id = request.query_params.get('brand')
-        latitude = request.query_params.get('latitude')
-        longitude = request.query_params.get('longitude')
-        user_address_id = request.query_params.get('address_id')
+        return render(request, 'category_base.html', context)
+    
+# #when clicked on brand this will be rendered
+# class BrandStoresView(APIView):
+#     permission_classes = [AllowAny]
 
-        if not brand_id:
-            return Response({'error': 'Brand ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
+#     def get(self, request, *args, **kwargs):
+#         brand_id = request.query_params.get('brand')
+#         latitude = request.query_params.get('latitude')
+#         longitude = request.query_params.get('longitude')
+#         user_address_id = request.query_params.get('address_id')
 
-        try:
-            brand = Brand.objects.get(id=brand_id)
-        except Brand.DoesNotExist:
-            return Response({'error': 'Brand not found.'}, status=status.HTTP_404_NOT_FOUND)
+#         if not brand_id:
+#             return Response({'error': 'Brand ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get user's location or selected address
+#         try:
+#             brand = Brand.objects.get(id=brand_id)
+#         except Brand.DoesNotExist:
+#             return Response({'error': 'Brand not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+#         # Get user's location or selected address
+#         user_coords = None
+#         if latitude and longitude:
+#             user_coords = (float(latitude), float(longitude))
+#         elif user_address_id:
+#             try:
+#                 address = Address.objects.get(id=user_address_id)
+#                 user_coords = (address.latitude, address.longitude)
+#             except Address.DoesNotExist:
+#                 return Response({'error': 'Address not found.'}, status=status.HTTP_404_NOT_FOUND)
+#         else:
+#             return Response({'error': 'Latitude, longitude, or address_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+#         # Fetch stores that have the brand
+#         stores = Store.objects.filter(brands=brand)
+
+#         # Calculate distances and find the nearest store
+#         store_distances = []
+#         for store in stores:
+#             store_coords = (store.latitude, store.longitude)
+#             distance = geodesic(user_coords, store_coords).kilometers
+#             store_distances.append((store, distance))
+
+#         store_distances.sort(key=lambda x: x[1])
+#         nearest_store = store_distances[0][0] if store_distances else None
+
+#         # Fetch products from the nearest store filtered by the brand
+#         products = Product.objects.filter(store=nearest_store, brand=brand) if nearest_store else []
+
+#         # Calculate estimated arrival time
+#         estimated_arrival_time = None
+#         if nearest_store:
+#             estimated_arrival_time = int(store_distances[0][1] * 60)  # Assuming 1 km = 1 minute of travel
+
+#         # Serialize store and brand data
+#         all_stores_serializer = StoreSerializer([store[0] for store in store_distances], many=True)
+#         nearest_store_serializer = StoreSerializer(nearest_store)
+#         categories = nearest_store.categories.all()
+#         categories_serializer = CategorySerializer(categories, many=True)
+#         brand_serializer = BrandSerializer(brand)
+#         products_serializer = ProductSerializer(products, many=True)
+
+
+#         data = {
+#             'brand': brand_serializer.data,
+#             'nearest_store': nearest_store_serializer.data,
+#             'all_stores': all_stores_serializer.data,
+#             'categories': categories_serializer.data,
+#             'estimated_arrival_time': estimated_arrival_time,
+#             'products': products_serializer.data,
+
+#         }
+#         return Response(data, status=status.HTTP_200_OK)
+
+class BrandStoresView(View):
+    def get(self, request, brand_slug, *args, **kwargs):
+        latitude = request.GET.get('latitude')
+        longitude = request.GET.get('longitude')
+        user_address_id = request.GET.get('address_id')
+
+        # Fetch the brand using the slug
+        brand = get_object_or_404(Brand, slug=brand_slug)
+
         user_coords = None
         if latitude and longitude:
-            user_coords = (float(latitude), float(longitude))
-        elif user_address_id:
             try:
-                address = Address.objects.get(id=user_address_id)
-                user_coords = (address.latitude, address.longitude)
-            except Address.DoesNotExist:
-                return Response({'error': 'Address not found.'}, status=status.HTTP_404_NOT_FOUND)
+                user_coords = (float(latitude), float(longitude))
+            except ValueError:
+                return HttpResponseBadRequest('Invalid latitude or longitude format.')
+        elif user_address_id:
+            address = get_object_or_404(Address, id=user_address_id)
+            user_coords = (address.latitude, address.longitude)
         else:
-            return Response({'error': 'Latitude, longitude, or address_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            return HttpResponseBadRequest('Latitude and longitude or address ID is required.')
 
-        # Fetch stores that have the brand
+        # Fetch stores that carry the brand
         stores = Store.objects.filter(brands=brand)
 
-        # Calculate distances and find the nearest store
+        # Calculate distances and sort by proximity
         store_distances = []
         for store in stores:
             store_coords = (store.latitude, store.longitude)
@@ -200,162 +402,281 @@ class BrandStoresView(APIView):
             store_distances.append((store, distance))
 
         store_distances.sort(key=lambda x: x[1])
-        nearest_store = store_distances[0][0] if store_distances else None
+        nearby_stores = [store[0] for store in store_distances]
 
-        # Fetch products from the nearest store filtered by the brand
-        products = Product.objects.filter(store=nearest_store, brand=brand) if nearest_store else []
-
-        # Calculate estimated arrival time
-        estimated_arrival_time = None
-        if nearest_store:
-            estimated_arrival_time = int(store_distances[0][1] * 60)  # Assuming 1 km = 1 minute of travel
-
-        # Serialize store and brand data
-        all_stores_serializer = StoreSerializer([store[0] for store in store_distances], many=True)
-        nearest_store_serializer = StoreSerializer(nearest_store)
-        categories = nearest_store.categories.all()
-        categories_serializer = CategorySerializer(categories, many=True)
-        brand_serializer = BrandSerializer(brand)
-        products_serializer = ProductSerializer(products, many=True)
-
-
-        data = {
-            'brand': brand_serializer.data,
-            'nearest_store': nearest_store_serializer.data,
-            'all_stores': all_stores_serializer.data,
-            'categories': categories_serializer.data,
-            'estimated_arrival_time': estimated_arrival_time,
-            'products': products_serializer.data,
-
+        # Pass the brand and stores data to the template
+        context = {
+            'brand_name': brand.name,
+            'nearby_stores': nearby_stores,
         }
-        return Response(data, status=status.HTTP_200_OK)
+
+        return render(request, 'brand_base.html', context)
 
 
-#individual store view
-class StoreDetailView(APIView):
+# #individual store view
+# class StoreDetailView(APIView):
+#     permission_classes = [AllowAny]
+
+#     def get(self, request, store_slug):
+#         try:
+#             # Fetch the store by slug
+#             store = Store.objects.get(slug=store_slug)
+            
+#             user_location = request.query_params.get('location')
+#             address_id = request.query_params.get('address_id')
+#             user_coords = None
+
+#             if user_location:
+#                 latitude, longitude = map(float, user_location.split(','))
+#                 user_coords = (latitude, longitude)
+#             elif address_id:
+#                 try:
+#                     address = Address.objects.get(id=address_id, user=request.user)
+#                     user_coords = (address.latitude, address.longitude)
+#                 except Address.DoesNotExist:
+#                     return Response({'error': 'Address not found'}, status=status.HTTP_404_NOT_FOUND)
+
+#             # Calculate the estimated arrival time if user location is available
+#             estimated_arrival_time = None
+#             if user_coords:
+#                 store_coords = (store.latitude, store.longitude)
+#                 distance = geodesic(user_coords, store_coords).kilometers
+
+#                 # Assuming an average speed of 35 km/h for delivery (you can adjust this)
+#                 average_speed_kmh = 35
+#                 estimated_time_hours = distance / average_speed_kmh
+#                 estimated_arrival_time = datetime.timedelta(hours=estimated_time_hours)
+
+
+            
+#             # Fetch all categories and brands associated with the store
+#             categories = Category.objects.filter(product__store=store).distinct()
+#             brands = Brand.objects.filter(product__store=store).distinct()
+            
+#             # Fetch all products available in the store
+#             products = Product.objects.filter(store=store)
+            
+#             # Serialize the data
+#             store_serializer = StoreSerializer(store)
+#             categories_serializer = CategorySerializer(categories, many=True)
+#             brands_serializer = BrandSerializer(brands, many=True)
+#             products_serializer = ProductSerializer(products, many=True)
+
+#             # Prepare the response data
+#             data = {
+#                 'store': store_serializer.data,
+#                 'categories': categories_serializer.data,
+#                 'brands': brands_serializer.data,
+#                 'products': products_serializer.data,
+#                 'estimated_arrival_time': estimated_arrival_time,
+
+#             }
+
+#             return Response(data, status=status.HTTP_200_OK)
+
+#         except Store.DoesNotExist:
+#             return Response({'error': 'Store not found'}, status=status.HTTP_404_NOT_FOUND)
+
+class StoreDetailView(View):
     def get(self, request, store_slug):
-        try:
-            # Fetch the store by slug
-            store = Store.objects.get(slug=store_slug)
-            
-            user_location = request.query_params.get('location')
-            address_id = request.query_params.get('address_id')
-            user_coords = None
+        # Fetch the store by slug or return 404 if not found
+        store = get_object_or_404(Store, slug=store_slug)
 
-            if user_location:
-                latitude, longitude = map(float, user_location.split(','))
-                user_coords = (latitude, longitude)
-            elif address_id:
-                try:
-                    address = Address.objects.get(id=address_id, user=request.user)
-                    user_coords = (address.latitude, address.longitude)
-                except Address.DoesNotExist:
-                    return Response({'error': 'Address not found'}, status=status.HTTP_404_NOT_FOUND)
+        latitude = request.GET.get('latitude')  # Get latitude from query parameters
+        longitude = request.GET.get('longitude')  # Get longitude from query parameters
+        address_id = request.GET.get('address_id')  # Get address_id from query parameters
+        user_coords = None
 
-            # Calculate the estimated arrival time if user location is available
-            estimated_arrival_time = None
-            if user_coords:
-                store_coords = (store.latitude, store.longitude)
-                distance = geodesic(user_coords, store_coords).kilometers
+        if latitude and longitude:
+            # Parse the user coordinates from the query parameters
+            user_coords = (float(latitude), float(longitude))
+        elif address_id:
+            # Fetch the address by ID and check if it belongs to the current user
+            address = get_object_or_404(Address, id=address_id, user=request.user)
+            user_coords = (address.latitude, address.longitude)
 
-                # Assuming an average speed of 35 km/h for delivery (you can adjust this)
-                average_speed_kmh = 35
-                estimated_time_hours = distance / average_speed_kmh
-                estimated_arrival_time = datetime.timedelta(hours=estimated_time_hours)
+        # Calculate the estimated arrival time if user coordinates are available
+        estimated_arrival_time = None
+        if user_coords:
+            store_coords = (store.latitude, store.longitude)
+            distance = geodesic(user_coords, store_coords).kilometers
+            average_speed_kmh = 35  # Assuming an average speed of 35 km/h for delivery
+            estimated_time_hours = distance / average_speed_kmh
+            estimated_arrival_time = estimated_time_hours * 60
 
-
-            
-            # Fetch all categories and brands associated with the store
-            categories = Category.objects.filter(product__store=store).distinct()
-            brands = Brand.objects.filter(product__store=store).distinct()
-            
-            # Fetch all products available in the store
-            products = Product.objects.filter(store=store)
-            
-            # Serialize the data
-            store_serializer = StoreSerializer(store)
-            categories_serializer = CategorySerializer(categories, many=True)
-            brands_serializer = BrandSerializer(brands, many=True)
-            products_serializer = ProductSerializer(products, many=True)
-
-            # Prepare the response data
-            data = {
-                'store': store_serializer.data,
-                'categories': categories_serializer.data,
-                'brands': brands_serializer.data,
-                'products': products_serializer.data,
-                'estimated_arrival_time': estimated_arrival_time,
-
-            }
-
-            return Response(data, status=status.HTTP_200_OK)
-
-        except Store.DoesNotExist:
-            return Response({'error': 'Store not found'}, status=status.HTTP_404_NOT_FOUND)
-
-
-
-#single product page
-class ProductDetailView(APIView):
-    def get(self, request, slug, *args, **kwargs):
-        try:
-            product = Product.objects.get(slug=slug)
-        except Product.DoesNotExist:
-            return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        product_serializer = ProductSerializer(product, context={'request': request})
-
-        # Fetch related store, brand, and category data
-        store_serializer = StoreSerializer(product.store)
-        brand_serializer = BrandSerializer(product.brand)
-        category_serializer = CategorySerializer(product.category)
-
-        # Fetch similar products
-        similar_products = product.get_similar_products()
-        similar_products_serializer = ProductSerializer(similar_products, many=True, context={'request': request})
-
-        data = {
-            'product': product_serializer.data,
-            'store': store_serializer.data,
-            'brand': brand_serializer.data,
-            'category': category_serializer.data,
-            'similar_products': similar_products_serializer.data,
+        # Fetch categories, brands, and products associated with the store
+        categories = Category.objects.filter(products__store=store).distinct()
+        brands = Brand.objects.filter(products__store=store).distinct()
+        products = Product.objects.filter(store=store)
+        store_address = f"{store.street_address}, {store.city}, {store.state}" if store.street_address else None
+        attributes = Attribute.objects.filter(values__products__store=store).distinct()
+        # Prepare the context for rendering
+        context = {
+            'store': store,
+            'categories': categories,
+            'brands': brands,
+            'products': products,
+            'estimated_arrival_time': estimated_arrival_time,
+            'store_address': store_address ,
+            'attributes' : attributes
         }
 
-        return Response(data, status=status.HTTP_200_OK)
+        # Render the template with the context data
+        return render(request, 'store_detail.html', context)
 
-#wishlist toggle & page view
-class WishlistToggleView(APIView):
-    permission_classes = [IsAuthenticated]
 
-    def get(self, request, *args, **kwargs):
-        wishlist = Wishlist.objects.filter(user=request.user)
-        wishlist_serializer = WishlistSerializer(wishlist, many=True)
-        return Response(wishlist_serializer.data, status=status.HTTP_200_OK)
+# #single product page
+# class ProductDetailView(APIView):
+#     permission_classes = [AllowAny]
 
-    def post(self, request, *args, **kwargs):
-        product_slug = request.data.get('product_slug')
-        try:
-            product = Product.objects.get(slug=product_slug)
-        except Product.DoesNotExist:
-            return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    
+#     def get(self, request, slug, *args, **kwargs):
+#         try:
+#             product = Product.objects.get(slug=slug)
+#         except Product.DoesNotExist:
+#             return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        Wishlist.objects.get_or_create(user=request.user, product=product)
-        return Response({'status': 'added'}, status=status.HTTP_201_CREATED)
+#         product_serializer = ProductSerializer(product, context={'request': request})
 
-    def delete(self, request, *args, **kwargs):
-        product_slug = request.data.get('product_slug')
-        try:
-            product = Product.objects.get(slug=product_slug)
-        except Product.DoesNotExist:
-            return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+#         # Fetch related store, brand, and category data
+#         store_serializer = StoreSerializer(product.store)
+#         brand_serializer = BrandSerializer(product.brand)
+#         category_serializer = CategorySerializer(product.category)
 
-        Wishlist.objects.filter(user=request.user, product=product).delete()
-        return Response({'status': 'removed'}, status=status.HTTP_204_NO_CONTENT)
+#         # Fetch similar products
+#         similar_products = product.get_similar_products()
+#         similar_products_serializer = ProductSerializer(similar_products, many=True, context={'request': request})
+
+#         data = {
+#             'product': product_serializer.data,
+#             'store': store_serializer.data,
+#             'brand': brand_serializer.data,
+#             'category': category_serializer.data,
+#             'similar_products': similar_products_serializer.data,
+#         }
+
+#         return Response(data, status=status.HTTP_200_OK)
+
+def product_detail_view(request, slug):
+    # Get the product by slug, return 404 if not found
+    product = get_object_or_404(Product, slug=slug)
+    
+    # Fetch similar products
+    similar_products = product.get_similar_products()
+    gallery_images = ProductImage.objects.filter(product=product)
+    is_wishlisted = Wishlist.objects.filter(user=request.user, product=product).exists()
+    discount_percentage = 0
+    if product.sale_price < product.mrp:
+        discount_percentage = ((product.mrp - product.sale_price) / product.mrp) * 100
+
+
+    # Pass the product, gallery images, and similar products to the template
+    context = {
+        'product': product,
+        'similar_products': similar_products,
+        'gallery_images': gallery_images,  # Pass gallery images separately
+        'discount_percentage': round(discount_percentage),  # Round off the percentage
+        'is_wishlisted': is_wishlisted  # Pass the wishlist status to the template
+
+
+
+    }
+
+    return render(request, 'product_detail.html', context)
+
+# #wishlist toggle & page view
+# class WishlistToggleView(APIView):
+#     permission_classes = [AllowAny]
+
+#     # permission_classes = [IsAuthenticated]
+
+#     def get(self, request, *args, **kwargs):
+#         wishlist = Wishlist.objects.filter(user=request.user)
+#         wishlist_serializer = WishlistSerializer(wishlist, many=True)
+#         return Response(wishlist_serializer.data, status=status.HTTP_200_OK)
+
+#     def post(self, request, *args, **kwargs):
+#         product_slug = request.data.get('product_slug')
+#         try:
+#             product = Product.objects.get(slug=product_slug)
+#         except Product.DoesNotExist:
+#             return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+
+#         Wishlist.objects.get_or_create(user=request.user, product=product)
+#         return Response({'status': 'added'}, status=status.HTTP_201_CREATED)
+
+#     def delete(self, request, *args, **kwargs):
+#         product_slug = request.data.get('product_slug')
+#         try:
+#             product = Product.objects.get(slug=product_slug)
+#         except Product.DoesNotExist:
+#             return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+
+#         Wishlist.objects.filter(user=request.user, product=product).delete()
+#         return Response({'status': 'removed'}, status=status.HTTP_204_NO_CONTENT)
+
+
+
+# View Wishlist
+@login_required
+def view_wishlist(request):
+    wishlist = Wishlist.objects.filter(user=request.user)
+    return render(request, 'wishlist.html', {'wishlist': wishlist})
+
+# Add to Wishlist
+@login_required
+@csrf_exempt
+def add_to_wishlist(request, product_slug):
+    product = get_object_or_404(Product, slug=product_slug)
+    wishlist, created = Wishlist.objects.get_or_create(user=request.user, product=product)
+    
+    if created:
+        return JsonResponse({'status': 'added'}, status=201)  # Product was added to wishlist
+    else:
+        return JsonResponse({'status': 'already_exists'}, status=200)  # Product already in wishlist
+
+# Remove from Wishlist
+@login_required
+@csrf_exempt
+def remove_from_wishlist(request, product_slug):
+    product = get_object_or_404(Product, slug=product_slug)
+    wishlist_item = Wishlist.objects.filter(user=request.user, product=product)
+
+    if wishlist_item.exists():
+        wishlist_item.delete()
+        return JsonResponse({'status': 'removed'}, status=204)
+    else:
+        return JsonResponse({'error': 'Product not found in wishlist'}, status=404)
+
+
+@require_GET  # Only accept GET requests
+def search_products(request):
+    query = request.GET.get('q', None)  # Get the query parameter from the request
+
+    if not query or len(query) < 2:
+        return JsonResponse({'error': 'Please enter at least 2 characters'}, status=400)
+
+    # Search products by name or other fields
+    products = Product.objects.filter(name__icontains=query)[:10]  # Limit to 10 results for performance
+    
+    # Prepare the product data to be returned in JSON format
+    product_list = [{
+        'name': product.name,
+        'price': product.sale_price,
+        'image': product.image.url,
+        'slug': product.slug
+    } for product in products]
+    print(product_list)
+    return JsonResponse({'products': product_list}, status=200)
+
+
+
 
 #add to cart
 class AddToCartView(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
         product_id = request.data.get('product_id')
@@ -377,23 +698,33 @@ class AddToCartView(APIView):
 
         return Response({'message': 'Item added to cart successfully'}, status=status.HTTP_200_OK)
 
-# Cart Page View
 class CartPageView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # Allow both authenticated and anonymous users to access
 
     def get(self, request, *args, **kwargs):
-        cart = Cart.objects.filter(user=request.user).first()
-        if cart:
+        # Check if the user is authenticated
+        if request.user.is_authenticated and not isinstance(request.user, AnonymousUser):
+            # Try to fetch the cart for the authenticated user, or create one if not found
+            cart, created = Cart.objects.get_or_create(user=request.user)
+
+            # If the cart is newly created, return an empty cart message
+            if created:
+                return Response({'message': 'Cart was created. It is currently empty.'}, status=status.HTTP_200_OK)
+
+            # If cart already exists, return the cart items and store info
             items = CartItemSerializer(cart.items.all(), many=True).data
-            store = StoreSerializer(cart.store).data
+            store = StoreSerializer(cart.store).data if cart.store else None
             return Response({'store': store, 'items': items}, status=status.HTTP_200_OK)
-        return Response({'message': 'Cart is empty'}, status=status.HTTP_200_OK)
+        
+        # Handle anonymous users
+        return Response({'message': 'Please log in to view your cart.'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
 
 #checkout page view
 class CheckoutPageView(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, *args, **kwargs):
         try:
@@ -477,7 +808,8 @@ class CheckoutPageView(APIView):
 
 #for previous orders
 class OrderDetailView(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request, order_id, *args, **kwargs):
         try:
@@ -523,94 +855,227 @@ class EmailVerificationTokenGenerator(PasswordResetTokenGenerator):
 account_activation_token = EmailVerificationTokenGenerator()
 
 
-class SignupView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request, *args, **kwargs):
-        serializer = UserSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            # Assign user to a specific group based on request data
-            group_name = request.data.get('group')
-            if group_name:
-                try:
-                    group = Group.objects.get(name=group_name)
-                    user.groups.add(group)
-                except Group.DoesNotExist:
-                    return Response({"error": "Invalid group name."}, status=status.HTTP_400_BAD_REQUEST)
-            # Send email verification link
-            self.send_verification_email(user, request)
-            return Response({"message": "User created successfully! Please verify your email to activate your account."}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def send_verification_email(self, user, request):
-        token = account_activation_token.make_token(user)
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        activation_link = request.build_absolute_uri(
-            reverse('verify_email', kwargs={'uidb64': uid, 'token': token})
-        )
-        subject = 'Activate Your Account'
-        message = f'Hi {user.username},\n\nPlease click the link below to verify your email and activate your account:\n\n{activation_link}\n\nThank you!'
-        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
-
-
-class VerifyEmailView(APIView):
-    def get(self, request, uidb64, token, *args, **kwargs):
-        try:
-            uid = force_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            user = None
-
-        if user is not None and account_activation_token.check_token(user, token):
-            user.is_active = True
-            user.save()
-            return Response({"message": "Email verified successfully!"}, status=status.HTTP_200_OK)
-        else:
-            return Response({"error": "Invalid token or user does not exist."}, status=status.HTTP_400_BAD_REQUEST)
-
-class LogoutView(APIView):
-    permission_classes = [IsAuthenticated]  # Ensures only authenticated users can log out
-
-    def post(self, request):
-        logout(request)
-        return Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
+# class SignupView(APIView):
+#     permission_classes = [AllowAny]
     
-class PasswordResetView(APIView):
-    def post(self, request):
-        email = request.data.get("email")
-        if not email:
-            return Response({"email": "This field is required."}, status=status.HTTP_400_BAD_REQUEST)
+#     @csrf_exempt
+#     def post(self, request, *args, **kwargs):
+#         serializer = UserSerializer(data=request.data)
+#         if serializer.is_valid():
+#             user = serializer.save()
+#             # Assign user to a specific group based on request data
+#             group_name = request.data.get('group')
+#             if group_name:
+#                 try:
+#                     group = Group.objects.get(name=group_name)
+#                     user.groups.add(group)
+#                 except Group.DoesNotExist:
+#                     return Response({"error": "Invalid group name."}, status=status.HTTP_400_BAD_REQUEST)
+#             # Send email verification link
+#             self.send_verification_email(user, request)
+#             return Response({"message": "User created successfully! Please verify your email to activate your account."}, status=status.HTTP_201_CREATED)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        form = PasswordResetForm(data=request.data)
-        if form.is_valid():
+#     def send_verification_email(self, user, request):
+#         token = account_activation_token.make_token(user)
+#         uid = urlsafe_base64_encode(force_bytes(user.pk))
+#         activation_link = request.build_absolute_uri(
+#             reverse('verify_email', kwargs={'uidb64': uid, 'token': token})
+#         )
+#         subject = 'Activate Your Account'
+#         message = f'Hi {user.username},\n\nPlease click the link below to verify your email and activate your account:\n\n{activation_link}\n\nThank you!'
+#         send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [user.email])
+
+
+# class VerifyEmailView(APIView):
+#     def get(self, request, uidb64, token, *args, **kwargs):
+#         try:
+#             uid = force_str(urlsafe_base64_decode(uidb64))
+#             user = User.objects.get(pk=uid)
+#         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+#             user = None
+
+#         if user is not None and account_activation_token.check_token(user, token):
+#             user.is_active = True
+#             user.save()
+#             return Response({"message": "Email verified successfully!"}, status=status.HTTP_200_OK)
+#         else:
+#             return Response({"error": "Invalid token or user does not exist."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+User = get_user_model()
+
+def signup_view(request):
+    if request.method == 'POST':
+        full_name = request.POST.get('full_name')
+        email = request.POST.get('email')
+        phone_number = request.POST.get('phone_number')
+        password = request.POST.get('password')
+        confirm_password = request.POST.get('confirm_password')
+
+        # Validate Password Match
+        if password != confirm_password:
+            messages.error(request, "Passwords do not match.")
+            return render(request, 'signup.html')
+
+        # Check if the email already exists
+        if User.objects.filter(email=email).exists():
+            messages.error(request, "An account with this email already exists.")
+            return render(request, 'signup.html')
+
+        # Create user
+        user = User.objects.create_user(
+            username=email,  # Assuming username is the same as email in your model
+            email=email,
+            phone_number=phone_number,
+            first_name=full_name.split()[0],  # You can handle full name better here
+            last_name=" ".join(full_name.split()[1:]),  # Handle if there is more than one name part
+            password=password,
+            is_active=False  # Initially, the user is inactive until they verify their email
+        )
+
+        # Add the user to the 'Customer' group
+        customer_group, created = Group.objects.get_or_create(name='Customer')
+        user.groups.add(customer_group)
+
+        # Generate email verification token
+        current_site = get_current_site(request)
+        mail_subject = 'Activate your account'
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        verification_link = reverse('activate', kwargs={'uidb64': uid, 'token': token})
+
+        full_link = f'http://{current_site.domain}{verification_link}'
+        message = render_to_string('email_verification.html', {
+            'user': user,
+            'domain': current_site.domain,
+            'uid': uid,
+            'token': token,
+            'verification_link': full_link
+        })
+        send_mail(mail_subject, message, settings.EMAIL_HOST_USER, [email])
+
+        messages.success(request, 'Please confirm your email to complete registration.')
+        return redirect('login')  # Redirect to login after signup
+    else:
+        return render(request, 'signup.html')
+
+
+def activate_account(request, uidb64, token):
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user is not None and default_token_generator.check_token(user, token):
+        user.is_active = True
+        user.save()
+        messages.success(request, 'Your account has been activated successfully!')
+        return redirect('login')
+    else:
+        messages.error(request, 'Activation link is invalid or has expired.')
+        return render(request, 'activation_invalid.html')
+
+
+def login_view(request):
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+
+        # Authenticate the user using email and password
+        user = authenticate(request, email=email, password=password)
+
+        if user is not None:
+            # If authentication is successful, log the user in
+            login(request, user)
+            if (login):
+                print(True)
+            return redirect('home')  # Redirect to homepage or any protected page
+        else:
+            # If authentication fails, show an error message
+            messages.error(request, 'Invalid email or password.')
+
+    return render(request, 'login.html')
+
+
+
+@login_required  # Ensures only authenticated users can log out
+def logout_view(request):
+    logout(request)
+    return redirect('login')  # Redirect to the login page after logout
+
+
+
+class PasswordResetView(FormView):
+    template_name = 'registration/password_reset_form.html'
+    success_url = reverse_lazy('password_reset_done')
+    form_class = PasswordResetForm
+    email_template_name = 'registration/password_reset_email.html'
+    subject_template_name = 'registration/password_reset_subject.txt'
+    from_email = settings.DEFAULT_FROM_EMAIL
+
+    def form_valid(self, form):
+        email = form.cleaned_data['email']
+        associated_users = User.objects.filter(email=email)
+
+        if associated_users.exists():
             opts = {
-                'use_https': request.is_secure(),
+                'use_https': self.request.is_secure(),
                 'token_generator': default_token_generator,
-                'from_email': getattr(settings, 'DEFAULT_FROM_EMAIL'),
-                'email_template_name': 'registration/password_reset_email.html',
-                'subject_template_name': 'registration/password_reset_subject.txt',
-                'request': request,
-                'html_email_template_name': 'registration/password_reset_email.html',
+                'from_email': self.from_email,
+                'email_template_name': self.email_template_name,
+                'subject_template_name': self.subject_template_name,
+                'request': self.request,
             }
             form.save(**opts)
-            return Response({"detail": "Password reset e-mail has been sent."}, status=status.HTTP_200_OK)
 
-        return Response({"detail": "Invalid email"}, status=status.HTTP_400_BAD_REQUEST)
+        return super().form_valid(form)
 
 
-class LoginView(APIView):
-    def post(self, request, *args, **kwargs):
-        email = request.data.get('email')
-        password = request.data.get('password')
+
+# class LogoutView(APIView):
+#     permission_classes = [IsAuthenticated]  # Ensures only authenticated users can log out
+
+#     def post(self, request):
+#         logout(request)
+#         return Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
+    
+# class PasswordResetView(APIView):
+#     def post(self, request):
+#         email = request.data.get("email")
+#         if not email:
+#             return Response({"email": "This field is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+#         form = PasswordResetForm(data=request.data)
+#         if form.is_valid():
+#             opts = {
+#                 'use_https': request.is_secure(),
+#                 'token_generator': default_token_generator,
+#                 'from_email': getattr(settings, 'DEFAULT_FROM_EMAIL'),
+#                 'email_template_name': 'registration/password_reset_email.html',
+#                 'subject_template_name': 'registration/password_reset_subject.txt',
+#                 'request': request,
+#                 'html_email_template_name': 'registration/password_reset_email.html',
+#             }
+#             form.save(**opts)
+#             return Response({"detail": "Password reset e-mail has been sent."}, status=status.HTTP_200_OK)
+
+#         return Response({"detail": "Invalid email"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# class LoginView(APIView):
+#     def post(self, request, *args, **kwargs):
+#         email = request.data.get('email')
+#         password = request.data.get('password')
         
-        user = authenticate(request, email=email, password=password)
+#         user = authenticate(request, email=email, password=password)
         
-        if user is not None:
-            login(request, user)
-            return Response({"message": "Login successful!"}, status=status.HTTP_200_OK)
-        else:
-            return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
+#         if user is not None:
+#             login(request, user)
+#             return Response({"message": "Login successful!"}, status=status.HTTP_200_OK)
+#         else:
+#             return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
         
 
 
@@ -1293,3 +1758,11 @@ class ShippingIntegrationView(APIView):
 
 
 
+def home(request):
+    return render(request, 'index.html')
+
+def category(request):
+    return render(request, 'category_base.html')
+
+def store(request):
+    return render(request, 'store_base.html')

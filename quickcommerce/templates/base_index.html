@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Rapparel{% endblock %}</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/home.css' %}">
+  {% block extra_css %}
+  <!-- Additional CSS goes here -->
+  {% endblock %}
+</head>
+
+<body>
+
+
+    
+  <!-- Mobile Header -->
+  <header id="mobile-header" class="d-none mobile-nav">
+    <nav class="navbar navbar-light bg-white justify-content-between  px-3 py-2">
+      <div class="d-flex align-items-center">
+        <a class="navbar-brand" href="/">
+          <img src="{%  static 'img/logo.svg'  %}" alt="Rapparel Logo" width="70" height="70">
+        </a>
+        <form class="form-inline" id="location-form">
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text text-sm" id="location-icon">
+                <i class="bi bi-geo-alt-fill"></i>
+              </span>
+            </div>
+          <!-- Input for manual address typing or displaying detected location -->
+          <input id="location-input" class="form-control mr-sm-2" type="search" placeholder="Detecting location..." aria-label="Location">
+        </div>
+
+          <!-- Dropdown for saved addresses (hidden by default) -->
+          <select id="location-select" class="form-control d-none">
+            <!-- Dynamically populated with saved addresses -->
+          </select>
+          <div id="location-suggestions" class="list-group mt-2 d-none"></div>
+  
+          <!-- Optional: Button to trigger form submission -->
+          <!-- <button id="submit-location" class="btn btn-primary btn-sm ml-2" type="submit">Submit</button> -->
+        </form>
+        
+        <!-- Message container for detected location -->
+        <div id="location-msg" class="mt-2 text-success"></div>
+      </div>
+
+      <form id="search-form" class="form-inline position-relative" style="flex-grow: 1;">
+        <input id="search-bar-mobile" class="form-control" type="text" placeholder="Search products" aria-label="Search">
+        <i class="bi bi-search search-icon"></i>
+    </form>
+    
+    <!-- Search results container -->
+    <div id="search-results" style="display: none; position: absolute; background-color: white; width: 100%; z-index: 1000;">
+        <!-- Search results will be dynamically inserted here -->
+    </div>
+    </nav>
+  </header>
+
+  <!-- Navbar for desktop -->
+  <nav class="navbar desktop-nav navbar-light bg-white justify-content-between content-container">
+    <div class="d-flex align-items-center">
+      <a class="navbar-brand" href="/">
+        <img src="{%  static 'img/logo.svg'  %}"  alt="Rapparel Logo" width="100" height="100">
+      </a>
+      <form class="form-inline" id="location-form">
+        <div class="input-group">
+          <div class="input-group-prepend">
+            <span class="input-group-text text-sm" id="location-icon-desktop">
+              <i class="bi bi-geo-alt-fill"></i>
+            </span>
+          </div>
+          <!-- Input for manual address typing or displaying detected location -->
+          <input id="location-input-desktop" class="form-control mr-sm-2" type="search" placeholder="Detecting location..." aria-label="Location">
+        </div>
+        <!-- Input for manual address typing or displaying detected location -->
+      
+        <!-- Dropdown for saved addresses (hidden by default) -->
+        <select id="location-select-desktop" class="form-control d-none">
+          <!-- Dynamically populated with saved addresses -->
+        </select>
+        <div id="location-suggestions" class="list-group mt-2 d-none"></div>
+
+        <!-- Optional: Button to trigger form submission -->
+        <!-- <button id="submit-location" class="btn btn-primary btn-sm ml-2" type="submit">Submit</button> -->
+      </form>
+      
+      <!-- Message container for detected location -->
+      <div id="location-msg" class="mt-2 text-success"></div>
+    </div>
+
+    <div class="d-flex align-items-center">
+      <form id="search-form" class="form-inline position-relative mr-2" style="flex-grow: 1;">
+        <input id="search-bar" class="form-control" type="text" placeholder="Search products" aria-label="Search">
+        <i class="bi bi-search search-icon"></i>
+    </form>
+    
+    <!-- Search results container -->
+    <div id="search-results" style=" position: absolute; background-color: white; width: 100%; z-index: 1000;">
+        <!-- Search results will be dynamically inserted here -->
+    </div>
+      
+      <a href="#" class="mr-3"><i class="bi bi-heart"></i></a>
+      <a href="#" class="mr-3"><i class="bi bi-bag"></i></a>
+      <a href="#"><i class="bi bi-person-circle"></i></a>
+    </div>
+  </nav>
+
+  <!-- Main content block -->
+  <div class="container-fluid">
+    {% block content %}
+    <!-- This block will be replaced with page-specific content -->
+    {% endblock %}
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-light text-justify text-lg-start">
+    <div class="container p-4">
+      <div class="row">
+        <div class="col-lg-3 col-md-6 mb-4">
+          <img src="{%  static 'img/logo.svg'  %}" alt="Rapparel Logo" width="100" height="100">
+          <p class="mt-3">
+            Rapparel is your one-stop shop for quality and trendy clothing. From casual to formal wear, we provide the latest fashion at the best prices.
+          </p>
+        </div>
+        <div class="col-lg-2 col-md-6 mb-4">
+          <h5>Shop</h5>
+          <ul class="list-unstyled mb-0">
+            <li><a href="#">Men</a></li>
+            <li><a href="#">Women</a></li>
+            <li><a href="#">Kids</a></li>
+            <li><a href="#">Accessories</a></li>
+            <li><a href="#">New Arrivals</a></li>
+          </ul>
+        </div>
+        <div class="col-lg-2 col-md-6 mb-4">
+          <h5>Company Info</h5>
+          <ul class="list-unstyled mb-0">
+            <li><a href="#">About Us</a></li>
+            <li><a href="#">Careers</a></li>
+            <li><a href="#">Blog</a></li>
+            <li><a href="#">Store Locator</a></li>
+          </ul>
+        </div>
+        <div class="col-lg-2 col-md-6 mb-4">
+          <h5>Customer Service</h5>
+          <ul class="list-unstyled mb-0">
+            <li><a href="#">FAQs</a></li>
+            <li><a href="#">Shipping & Returns</a></li>
+            <li><a href="#">Contact Us</a></li>
+            <li><a href="#">Terms & Conditions</a></li>
+            <li><a href="#">Privacy Policy</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="text-center pt-3">
+        <a href="#" class="mr-3"><i class="bi bi-facebook"></i></a>
+        <a href="#" class="mr-3"><i class="bi bi-twitter"></i></a>
+        <a href="#" class="mr-3"><i class="bi bi-instagram"></i></a>
+        <a href="#"><i class="bi bi-linkedin"></i></a>
+      </div>
+      <div class="text-center mt-4">
+        <p>&copy; 2024 Rapparel. All Rights Reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Bottom Navigation Bar for Mobile -->
+<nav id="bottom-nav" class="navbar fixed-bottom navbar-light bg-light">
+    <div class="d-flex justify-content-around w-100">
+      <a href="#" class="nav-item text-center">
+        <i class="bi bi-house-door" style="font-size: 1.5rem;"></i>
+        <p>Home</p>
+      </a>
+      <a href="#" class="nav-item text-center">
+        <i class="bi bi-bag" style="font-size: 1.5rem;"></i>
+        <p>Cart</p>
+      </a>
+      <a href="#" class="nav-item text-center">
+        <i class="bi bi-person-circle" style="font-size: 1.5rem;"></i>
+        <p>Account</p>
+      </a>
+      <a href="#" class="nav-item text-center">
+        <i class="bi bi-heart" style="font-size: 1.5rem;"></i>
+        <p>Wishlist</p>
+      </a>
+    </div>
+  </nav>
+
+  <script src="https://kit.fontawesome.com/a076d05399.js"></script>
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="{% static 'js/home.js' %}"></script>
+
+  <script>
+ $(document).ready(function () {
+
+  var typingTimer;
+    var doneTypingInterval = 300; // Time in ms (0.3 seconds)
+    var $input = $('#location-input-desktop');
+    var $suggestions = $('#location-suggestions-desktop');
+
+    // On keyup, start the countdown for the user typing
+    $input.on('keyup', function () {
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(doneTyping, doneTypingInterval);
+    });
+
+    // On keydown, clear the countdown
+    $input.on('keydown', function () {
+        clearTimeout(typingTimer);
+    });
+
+    // User is done typing, fetch suggestions
+    function doneTyping() {
+        var query = $input.val();
+
+        // If the input is empty, clear the suggestions
+        if (query.length === 0) {
+            $suggestions.empty().addClass('d-none');
+            return;
+        }
+
+        // Make an AJAX request to the Nominatim API for autocomplete suggestions
+        var apiUrl = 'https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' + query;
+
+        $.getJSON(apiUrl, function (data) {
+            // Clear previous suggestions
+            $suggestions.empty();
+
+            // If no results, show "No results found"
+            if (data.length === 0) {
+                $suggestions.append('<div class="list-group-item list-group-item-action">No results found</div>');
+            } else {
+                // Loop through results and append to suggestions div
+                data.forEach(function (item) {
+                    var displayAddress = item.display_name;
+                    var lat = item.lat;
+                    var lon = item.lon;
+
+                    // Append each result as an option
+                    $suggestions.append(
+                        '<a href="#" class="list-group-item list-group-item-action" data-lat="' + lat + '" data-lon="' + lon + '">' + displayAddress + '</a>'
+                    );
+                });
+            }
+
+            // Show the suggestions box
+            $suggestions.removeClass('d-none');
+        });
+    }
+
+    // Handle clicking on a suggestion
+    $suggestions.on('click', 'a', function (e) {
+        e.preventDefault();
+
+        // Get the selected address and coordinates
+        var selectedAddress = $(this).text();
+        var latitude = $(this).data('lat');
+        var longitude = $(this).data('lon');
+
+        // Update the input field with the selected address
+        $input.val(selectedAddress);
+        $suggestions.empty().addClass('d-none'); // Hide suggestions
+
+        // Optionally, send the latitude and longitude to the server or update the URL
+        updateUrlWithLocation(latitude, longitude);
+    });
+
+    // Function to update URL with latitude and longitude
+    function updateUrlWithLocation(latitude, longitude) {
+        var currentUrl = window.location.href.split('?')[0]; // Get current URL without query params
+        var newUrl = currentUrl + '?latitude=' + latitude + '&longitude=' + longitude;
+        history.replaceState({}, '', newUrl); // Update the URL without reloading the page
+    }
+
+
+
+
+
+
+
+
+
+
+    var savedAddresses = []; // This will be fetched using AJAX, as shown below
+
+    // Fetch saved addresses using AJAX when the page loads
+    // Fetch saved addresses using AJAX when the page loads
+$.ajax({
+    url: "{% url 'fetch_saved_addresses' %}",  // URL of the view you created
+    method: "GET",
+    success: function(data) {
+        savedAddresses = data;
+        if (savedAddresses.length > 0) {
+            // Enable manual search for both desktop and non-desktop
+            $('#location-input, #location-input-desktop').attr('placeholder', 'Search for location');
+            $('#location-input, #location-input-desktop').prop('disabled', false);  // Make input field editable
+            $('#location-select, #location-select-desktop').removeClass('d-none');  // Show the select box
+
+            // Populate the select box with the saved addresses for both desktop and non-desktop
+            savedAddresses.forEach(function (address) {
+                var displayAddress = address.street_address + ', ' + address.city + ', ' + address.state + ', ' + address.country;
+                $('#location-select, #location-select-desktop').append(new Option(displayAddress, address.id));
+                updateBrandLinksWithAddress(address.id);
+                updateCategoryLinksWithAddress(address.id);
+            });
+
+            // Add an option for manually searching or using current location
+            $('#location-select, #location-select-desktop').append(new Option("Use my current location", "current_location"));
+            $('#location-input, #location-input-desktop').prop('disabled', true); // Disable input by default if saved addresses exist
+        } else {
+            // Automatically detect the real-time location if no saved addresses
+            detectRealTimeLocation();
+        }
+    },
+    error: function(error) {
+        console.log("Error fetching saved addresses:", error);
+    }
+});
+
+// Detect real-time location on page load
+function detectRealTimeLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function (position) {
+            var latitude = position.coords.latitude;
+            var longitude = position.coords.longitude;
+
+            // Use reverse geocoding to convert coordinates into an address
+            var geocodingUrl = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + latitude + '&lon=' + longitude;
+
+            $.getJSON(geocodingUrl, function (data) {
+                var detectedAddress = data.display_name;
+
+                // Display detected address in the input fields for both desktop and non-desktop
+                $('#location-input, #location-input-desktop').val(detectedAddress);
+                $('#location-input, #location-input-desktop').prop('disabled', true); // Disable the input field for detected address
+                $('#location-input, #location-input-desktop').attr('placeholder', 'Location detected');
+                // Optionally, pass latitude and longitude as hidden fields or form data
+                updateBrandLinksWithLocation(latitude, longitude);
+                updateCategoryLinksWithLocation(latitude, longitude);
+                updateUrlWithLocation(latitude, longitude);
+              });
+        }, function (error) {
+            alert('Error detecting location: ' + error.message);
+        });
+    } else {
+        alert('Geolocation is not supported by this browser.');
+    }
+}
+
+// Allow switching between manual entry and saved address/current location
+$('#location-select, #location-select-desktop').on('change', function() {
+    if ($(this).val() === "current_location") {
+        detectRealTimeLocation(); // Re-trigger location detection
+        $('#location-input, #location-input-desktop').prop('disabled', true);  // Disable manual entry
+    } else {
+        $('#location-input, #location-input-desktop').prop('disabled', false); // Enable manual entry if not using current location
+        $('#location-input, #location-input-desktop').val('');  // Clear the input for manual typing
+    }
+});
+
+
+
+    
+
+
+
+
+
+
+
+    // Function to update URL with latitude and longitude
+    function updateUrlWithLocation(latitude, longitude) {
+        var currentUrl = window.location.href.split('?')[0]; // Get current URL without query params
+        var newUrl = currentUrl + '?latitude=' + latitude + '&longitude=' + longitude;
+        history.replaceState({}, '', newUrl); // Update the URL without reloading the page
+    }
+
+     // Function to update the href for each brand link with latitude and longitude
+     function updateBrandLinksWithLocation(latitude, longitude) {
+        $('.brand-item a').each(function() {
+            var brandSlug = $(this).data('brand-slug');
+            var newHref = "{% url 'brand_stores' 'brand-slug' %}".replace('brand-slug', brandSlug);
+
+            // Append latitude and longitude as query parameters
+            newHref += "?latitude=" + latitude + "&longitude=" + longitude;
+            $(this).attr('href', newHref);
+        });
+    }
+
+
+    // Function to update the href for each brand link with the saved address id
+    function updateBrandLinksWithAddress(addressId) {
+        $('.brand-item a').each(function() {
+            var brandSlug = $(this).data('brand-slug');
+            var newHref = "{% url 'brand_stores' 'brand-slug' %}".replace('brand-slug', brandSlug);
+
+            // Append the address id as a query parameter
+            newHref += "?address_id=" + addressId;
+            $(this).attr('href', newHref);
+        });
+    }
+
+    // Function to update the href for each category link with latitude and longitude
+    function updateCategoryLinksWithLocation(latitude, longitude) {
+        $('.category-item a').each(function() {
+            var categorySlug = $(this).data('category-slug');
+            var newHref = "{% url 'category_stores' 'category-slug' %}".replace('category-slug', categorySlug);
+
+            // Append latitude and longitude as query parameters
+            newHref += "?latitude=" + latitude + "&longitude=" + longitude;
+            $(this).attr('href', newHref);
+        });
+    }
+
+    // Function to update the href for each category link with the saved address id
+    function updateCategoryLinksWithAddress(addressId) {
+        $('.category-item a').each(function() {
+            var categorySlug = $(this).data('category-slug');
+            var newHref = "{% url 'category_stores' 'category-slug' %}".replace('category-slug', categorySlug);
+
+            // Append the address id as a query parameter
+            newHref += "?address_id=" + addressId;
+            $(this).attr('href', newHref);
+        });
+    }
+});
+</script>
+<script>
+  const totalCards = $('.store-card').length;
+
+// Hide the "View More" button if there are 8 or fewer cards
+if (totalCards <= 8) {
+    $('#viewMoreBtn').hide();
+}
+
+$('#viewMoreBtn').on('click', function () {
+    // Select the hidden store cards
+    const hiddenCards = $('.store-card.d-none');
+    
+    // Reveal the next 8 hidden cards
+    hiddenCards.slice(0, 8).removeClass('d-none');
+    
+    // If no more hidden cards, hide the View More button
+    if ($('.store-card.d-none').length === 0) {
+        $(this).hide();
+    }
+});
+</script>
+<script>
+  $(document).ready(function() {
+    let typingTimer;
+    const typingDelay = 3000; // 3s delay after typing stops
+    const searchInputs = $('#search-bar, #search-bar-mobile');  // Select both inputs
+    const searchResults = $('#search-results');  // Assuming you have a div to display the search results
+
+    // Function to perform the search request
+    function performSearch(query) {
+      console.log('Performing search for:', query);  // Add log to check if search is triggered
+
+        $.ajax({
+            url: '/search/',  // The URL of your search view
+            method: 'GET',
+            data: {
+                'query': query
+            },
+            success: function(response) {
+              console.log('Response:', response); 
+                if (response.products && response.products.length > 0) {
+                    searchResults.empty();  // Clear any existing results
+                    response.products.forEach(product => {
+                        const productHTML = `
+                            <div class="search-result-item">
+                                <img src="${product.image}" alt="${product.name}" class="search-result-img">
+                                <div class="search-result-info">
+                                    <a href="/product/${product.slug}/">${product.name}</a>
+                                    <p>Rs. ${product.price}</p>
+                                </div>
+                            </div>`;
+                        searchResults.append(productHTML);  // Append the result to the results div
+                    });
+                    searchResults.show();  // Show results
+                } else {
+                    searchResults.html('<p>No products found</p>').show();
+                }
+            },
+            error: function(error) {
+                console.log('Error:', error);
+            }
+        });
+    }
+
+    // Handle input event on the search bar
+    searchInput.on('input', function() {
+        const query = $(this).val();
+        clearTimeout(typingTimer);
+        if (query.length >= 2) {
+            typingTimer = setTimeout(() => performSearch(query), typingDelay);
+        } else {
+            searchResults.empty().hide();  // Hide the results if less than 2 characters
+        }
+    });
+});
+
+</script>
+</body>
+
+</html>

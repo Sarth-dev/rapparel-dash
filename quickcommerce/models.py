@@ -28,12 +28,29 @@ class User(AbstractUser):
 class Category(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, unique=True)
+    slug = models.SlugField(max_length=255, unique=False, blank=True, null=True)  # Add slug field
     logo = models.ImageField(upload_to='category_logos/', blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='subcategories')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+
+    def save(self, *args, **kwargs):
+        if not self.slug:  # Only generate slug if it is empty
+            original_slug = slugify(self.name)
+            unique_slug = original_slug
+            counter = 1
+
+            # Ensure the slug is unique
+            while Category.objects.filter(slug=unique_slug).exists():
+                unique_slug = f'{original_slug}-{counter}'
+                counter += 1
+
+            self.slug = unique_slug
+        super().save(*args, **kwargs)
+
+
     def __str__(self):
         return self.name
     
@@ -45,10 +62,26 @@ class Category(models.Model):
 class Brand(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, unique=True)
+    slug = models.SlugField(max_length=255, unique=False, blank=True, null=True)  # Add slug field
     logo = models.ImageField(upload_to='brand_logos/', blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:  # Only generate slug if it is empty
+            original_slug = slugify(self.name)
+            unique_slug = original_slug
+            counter = 1
+
+            # Ensure the slug is unique
+            while Brand.objects.filter(slug=unique_slug).exists():
+                unique_slug = f'{original_slug}-{counter}'
+                counter += 1
+
+            self.slug = unique_slug
+        super().save(*args, **kwargs)
+
 
     def __str__(self):
         return self.name
@@ -56,9 +89,10 @@ class Brand(models.Model):
 # Store Model
 class Store(models.Model):
     INVENTORY_SOFTWARE_CHOICES = [
-        ('Excel', 'Excel'),
-        ('Software1', 'Software1'),
-        ('Software2', 'Software2'),
+        ('excel', 'Excel'),
+        ('unicommerce', 'UniCommerce'),
+        ('sap_hana', 'SAP HANA'),
+        ('logicerp', 'LogicERP'),
     ]
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, unique=True)  # Ensure store name is unique
@@ -76,11 +110,19 @@ class Store(models.Model):
     contact_person_name = models.CharField(max_length=255, blank=True, null=True)
     contact_person_number = models.CharField(max_length=15, blank=True, null=True)
     display_image = models.ImageField(upload_to='store_images/', blank=True, null=True)
-    inventory_software = models.CharField(max_length=255, choices=INVENTORY_SOFTWARE_CHOICES, default='Excel')  # Select box
+    banner_image = models.ImageField(upload_to='store_images/banners/', blank=True, null=True)
+    inventory_software = models.CharField(max_length=255, choices=INVENTORY_SOFTWARE_CHOICES)  # Select box
     commission_rate = models.DecimalField(max_digits=5, decimal_places=2, help_text="Commission rate as a percentage")
     is_featured = models.BooleanField(default=False)  # Added field for featured stores
     categories = models.ManyToManyField(Category, related_name='stores')
     brands = models.ManyToManyField(Brand, related_name='stores')
+
+    # Fields for API access and credentials
+    api_access_token = models.CharField(max_length=255, blank=True, null=True)
+    api_refresh_token = models.CharField(max_length=255, blank=True, null=True)
+    api_token_expiry = models.DateTimeField(blank=True, null=True)
+    api_client_id = models.CharField(max_length=255, blank=True, null=True)
+    api_client_secret = models.CharField(max_length=255, blank=True, null=True)
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -187,9 +229,9 @@ class Product(models.Model):
         if self.sale_price > self.mrp:
             raise ValidationError("Sale price cannot be greater than the MRP.")
 
-    def save(self, *args, **kwargs):
-        self.full_clean()  # Ensure clean method is called
-        super(Product, self).save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     self.full_clean()  # Ensure clean method is called
+    #     super(Product, self).save(*args, **kwargs)
 
 
 #for product gallery
