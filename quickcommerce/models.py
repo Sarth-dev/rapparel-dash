@@ -334,6 +334,10 @@ class Order(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, related_name='orders', on_delete=models.CASCADE)
     # address = models.ForeignKey(Address, related_name='orders', on_delete=models.CASCADE)
+
+    full_name = models.CharField(max_length=255)  # Full name of the person who placed the order
+    phone_number = models.CharField(max_length=15)  # Phone number with reasonable length
+    email = models.EmailField()
     street_address = models.CharField(max_length=255,blank=True, null=True)
     city = models.CharField(max_length=100,blank=True, null=True)
     state = models.CharField(max_length=100,blank=True, null=True)

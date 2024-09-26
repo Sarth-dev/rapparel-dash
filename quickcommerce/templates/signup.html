@@ -29,11 +29,14 @@
         </div>
 
         <!-- Password Input -->
-        <div class="password-field mb-3">
-            <input type="password" id="password" name="password" class="form-control" placeholder="Password" required>
-            <span class="input-group-text" onclick="togglePassword()">
-                <i class="bi bi-eye" id="togglePasswordIcon"></i>
-            </span>
+       <!-- Password Input -->
+        <div class="mb-3">
+            <div class="input-group">
+                <input type="password" id="password" name="password" class="form-control" placeholder="Password" required>
+                <span class="input-group-text" onclick="togglePassword()">
+                    <i class="bi bi-eye" id="togglePasswordIcon"></i>
+                </span>
+            </div>
             <div class="invalid-feedback" id="passwordError"></div>
         </div>
 
@@ -64,10 +67,12 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    // JavaScript logic for form validation and password toggle
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-    document.getElementById("registerForm").addEventListener("submit", function(event) {
+<script>
+   $(document).ready(function() {
+    clearErrors();
+    $("#registerForm").on("submit", function(event) {
         event.preventDefault(); // Prevent form submission for validation
 
         // Clear previous errors
@@ -76,85 +81,82 @@
         let isValid = true;
 
         // Validate Full Name
-        const fullName = document.getElementById("fullName").value;
+        const fullName = $("#fullName").val();
         if (fullName.length < 3) {
             isValid = false;
-            displayError("fullNameError", "Full Name must be at least 3 characters long.");
+            displayError("#fullName", "#fullNameError", "Full Name must be at least 3 characters long.");
         }
 
         // Validate Email
-        const email = document.getElementById("email").value;
+        const email = $("#email").val();
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailPattern.test(email)) {
             isValid = false;
-            displayError("emailError", "Please enter a valid email address.");
+            displayError("#email", "#emailError", "Please enter a valid email address.");
         }
 
         // Validate Phone Number
-        const phoneNumber = document.getElementById("phoneNumber").value;
+        const phoneNumber = $("#phoneNumber").val();
         const phonePattern = /^[0-9]{10,15}$/;
         if (!phonePattern.test(phoneNumber)) {
             isValid = false;
-            displayError("phoneNumberError", "Please enter a valid phone number (10-15 digits).");
+            displayError("#phoneNumber", "#phoneNumberError", "Please enter a valid phone number (10-15 digits).");
         }
 
         // Validate Password
-        const password = document.getElementById("password").value;
+        const password = $("#password").val();
         const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
         if (!passwordPattern.test(password)) {
             isValid = false;
-            displayError("passwordError", "Password must be at least 8 characters long, contain one uppercase letter, one lowercase letter, one number, and one special character.");
+            displayError("#password", "#passwordError", "Password must be at least 8 characters long, contain one uppercase letter, one lowercase letter, one number, and one special character.");
         }
 
         // Validate Confirm Password
-        const confirmPassword = document.getElementById("confirmPassword").value;
+        const confirmPassword = $("#confirmPassword").val();
         if (password !== confirmPassword) {
             isValid = false;
-            displayError("confirmPasswordError", "Passwords do not match.");
+            displayError("#confirmPassword", "#confirmPasswordError", "Passwords do not match.");
         }
 
         // Validate Terms & Conditions
-        const terms = document.getElementById("terms").checked;
+        const terms = $("#terms").is(":checked");
         if (!terms) {
             isValid = false;
-            displayError("termsError", "You must agree to the terms.");
+            displayError("#terms", "#termsError", "You must agree to the terms.");
         }
 
         // If all validations pass, submit the form
         if (isValid) {
-            document.getElementById("registerForm").submit();
+            $("#registerForm")[0].submit();
         }
     });
 
     function clearErrors() {
-        document.getElementById("fullNameError").textContent = "";
-        document.getElementById("emailError").textContent = "";
-        document.getElementById("phoneNumberError").textContent = "";
-        document.getElementById("passwordError").textContent = "";
-        document.getElementById("confirmPasswordError").textContent = "";
-        document.getElementById("termsError").textContent = "";
+        $(".form-control").removeClass("is-invalid");
+        $(".invalid-feedback").text("");
     }
 
-    function displayError(elementId, errorMessage) {
-        document.getElementById(elementId).textContent = errorMessage;
+    function displayError(inputSelector, errorSelector, errorMessage) {
+        $(inputSelector).addClass("is-invalid");
+        $(errorSelector).text(errorMessage);
     }
 
-    function togglePassword() {
-        const passwordField = document.getElementById('password');
-        const confirmpasswordField = document.getElementById('confirmPassword');
-        const toggleIcon = document.getElementById('togglePasswordIcon');
+    $("#togglePasswordIcon").on("click", function() {
+        const passwordField = $('#password');
+        const confirmPasswordField = $('#confirmPassword');
+        const toggleIcon = $('#togglePasswordIcon');
 
-        if (passwordField.type === 'password' && confirmpasswordField.type === 'password') {
-            passwordField.type = 'text';
-            confirmpasswordField.type = 'text';
-            toggleIcon.classList.remove('bi-eye');
-            toggleIcon.classList.add('bi-eye-slash');
+        if (passwordField.attr('type') === 'password' && confirmPasswordField.attr('type') === 'password') {
+            passwordField.attr('type', 'text');
+            confirmPasswordField.attr('type', 'text');
+            toggleIcon.removeClass('bi-eye').addClass('bi-eye-slash');
         } else {
-            passwordField.type = 'password';
-            confirmpasswordField.type = 'password';
-            toggleIcon.classList.remove('bi-eye-slash');
-            toggleIcon.classList.add('bi-eye');
+            passwordField.attr('type', 'password');
+            confirmPasswordField.attr('type', 'password');
+            toggleIcon.removeClass('bi-eye-slash').addClass('bi-eye');
         }
-    }
+    });
+});
+
 </script>
 {% endblock %}

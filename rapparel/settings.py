@@ -19,12 +19,16 @@ import os
 # django_heroku.settings(locals())
 #change as per email provider
 # EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.google.com' 
-EMAIL_PORT = 587
+# Email settings
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp-relay.brevo.com'  # Your SMTP server
+EMAIL_PORT = 587  # SMTP port
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'info@rapparel.com'
-EMAIL_HOST_PASSWORD = 'xxsdfdsd'
-DEFAULT_FROM_EMAIL = 'info@rapparel.com'
+EMAIL_HOST_USER = '7ccf54001@smtp-brevo.com'
+EMAIL_HOST_PASSWORD = '4ny9GH1MgcbEU62w'
+DEFAULT_FROM_EMAIL = 'info@rapparelsolutions.com'
+ADMIN_EMAIL = 'info@rapparelsolutions.com'
+SUPPORT_EMAIL = 'info@rapparelsolutions.com'  # Used in the email template
 
 
 

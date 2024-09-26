@@ -29,6 +29,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group, AnonymousUser
 from django.contrib.auth import get_user_model
 
+
+from django.core.mail import EmailMultiAlternatives
 from django.contrib import messages
 from django.contrib.sites.shortcuts import get_current_site
 from django.views.decorators.csrf import csrf_exempt
@@ -36,8 +38,9 @@ from django.views.generic.edit import FormView
 from django.views.generic import TemplateView
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.views import View
-from django.views.decorators.http import require_GET
-
+from django.views.decorators.http import require_GET, require_POST
+from django.utils import timezone
+from django.db import IntegrityError  # Import IntegrityError to handle duplicates
 
 
 
@@ -510,6 +513,8 @@ class StoreDetailView(View):
         products = Product.objects.filter(store=store)
         store_address = f"{store.street_address}, {store.city}, {store.state}" if store.street_address else None
         attributes = Attribute.objects.filter(values__products__store=store).distinct()
+        wishlisted_products = Wishlist.objects.filter(user=request.user).values_list('product__id', flat=True)
+
         # Prepare the context for rendering
         context = {
             'store': store,
@@ -517,6 +522,7 @@ class StoreDetailView(View):
             'brands': brands,
             'products': products,
             'estimated_arrival_time': estimated_arrival_time,
+            'wishlisted_products': wishlisted_products,
             'store_address': store_address ,
             'attributes' : attributes
         }
@@ -645,9 +651,17 @@ def remove_from_wishlist(request, product_slug):
 
     if wishlist_item.exists():
         wishlist_item.delete()
-        return JsonResponse({'status': 'removed'}, status=204)
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            # If it's an AJAX request, return a JSON response with the redirect URL
+            return JsonResponse({'status': 'removed', 'redirect_url': '/wishlist/'}, status=200)
+        else:
+            # Otherwise, redirect back to the wishlist page
+            return redirect('view_wishlist')
     else:
-        return JsonResponse({'error': 'Product not found in wishlist'}, status=404)
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'error': 'Product not found in wishlist'}, status=404)
+        else:
+            return redirect('view_wishlist')
 
 
 @require_GET  # Only accept GET requests
@@ -673,89 +687,248 @@ def search_products(request):
 
 
 
-#add to cart
-class AddToCartView(APIView):
-    # permission_classes = [IsAuthenticated]
-    permission_classes = [AllowAny]
+# #add to cart
+# class AddToCartView(APIView):
+#     # permission_classes = [IsAuthenticated]
+#     permission_classes = [AllowAny]
 
-    def post(self, request, *args, **kwargs):
-        product_id = request.data.get('product_id')
-        quantity = request.data.get('quantity', 1)
+#     def post(self, request, *args, **kwargs):
+#         product_id = request.data.get('product_id')
+#         quantity = request.data.get('quantity', 1)
         
+#         product = get_object_or_404(Product, id=product_id)
+#         store = product.store
+#         cart, created = Cart.objects.get_or_create(user=request.user)
+
+#         if cart.store and cart.store != store:
+#             # Empty the cart if the store is different
+#             cart.items.clear()
+
+#         cart.store = store
+#         cart_item, created = CartItem.objects.get_or_create(cart=cart, product=product)
+#         cart_item.quantity = quantity
+#         cart_item.save()
+#         cart.save()
+
+#         return Response({'message': 'Item added to cart successfully'}, status=status.HTTP_200_OK)
+
+# class CartPageView(APIView):
+#     permission_classes = [AllowAny]  # Allow both authenticated and anonymous users to access
+
+#     def get(self, request, *args, **kwargs):
+#         # Check if the user is authenticated
+#         if request.user.is_authenticated and not isinstance(request.user, AnonymousUser):
+#             # Try to fetch the cart for the authenticated user, or create one if not found
+#             cart, created = Cart.objects.get_or_create(user=request.user)
+
+#             # If the cart is newly created, return an empty cart message
+#             if created:
+#                 return Response({'message': 'Cart was created. It is currently empty.'}, status=status.HTTP_200_OK)
+
+#             # If cart already exists, return the cart items and store info
+#             items = CartItemSerializer(cart.items.all(), many=True).data
+#             store = StoreSerializer(cart.store).data if cart.store else None
+#             return Response({'store': store, 'items': items}, status=status.HTTP_200_OK)
+        
+#         # Handle anonymous users
+#         return Response({'message': 'Please log in to view your cart.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+
+# #checkout page view
+# class CheckoutPageView(APIView):
+#     # permission_classes = [IsAuthenticated]
+#     permission_classes = [AllowAny]
+
+#     def get(self, request, *args, **kwargs):
+#         try:
+#             cart = Cart.objects.get(user=request.user)
+#         except Cart.DoesNotExist:
+#             return Response({'detail': 'Cart is empty.'}, status=status.HTTP_404_NOT_FOUND)
+
+#         addresses = Address.objects.filter(user=request.user)
+#         address_serializer = AddressSerializer(addresses, many=True)
+#         cart_serializer = CartSerializer(cart)
+
+#         data = {
+#             'cart': cart_serializer.data,
+#             'addresses': address_serializer.data,
+#         }
+#         return Response(data, status=status.HTTP_200_OK)
+
+#     def post(self, request, *args, **kwargs):
+#         cart = Cart.objects.get(user=request.user)
+#         address_id = request.data.get('address_id')
+#         payment_method = request.data.get('payment_method')
+
+#         if not cart.items.exists():
+#             return Response({'error': 'Your cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
+
+#         try:
+#             address = Address.objects.get(id=address_id, user=request.user)
+#         except Address.DoesNotExist:
+#             return Response({'error': 'Invalid address'}, status=status.HTTP_400_BAD_REQUEST)
+
+#         total_amount = sum(item.product.sale_price * item.quantity for item in cart.items.all())
+
+#         # Create the order
+#         order = Order.objects.create(
+#             user=request.user,
+#             address=address,
+#             total_amount=total_amount,
+#             payment_status='Pending',
+#             order_status='Processing',
+#             payment_method=payment_method,
+#         )
+
+#         # Create order items
+#         for item in cart.items.all():
+#             OrderItem.objects.create(
+#                 order=order,
+#                 product=item.product,
+#                 quantity=item.quantity,
+#                 price=item.product.sale_price,
+#             )
+
+#         # Clear the cart after order creation
+#         cart.items.all().delete()
+
+#         # Send Invoice Email
+#         subject = f"Invoice for Order #{order.id}"
+#         context = {
+#             'order': order,
+#             'user': request.user,
+#             'logo_url': 'https://rapparel.com/static/logo.png',  # replace with actual logo URL
+#         }
+
+#         html_message = render_to_string('invoice_email.html', context)
+#         plain_message = strip_tags(html_message)
+
+#         customer_email = EmailMessage(subject, html_message, 'info@rapprel.com', [request.user.email])
+#         customer_email.content_subtype = 'html'
+#         customer_email.send()
+
+#         # Send to Owner
+#         owner_email = EmailMessage(subject, html_message, 'info@rapprel.com', ['owner@rapprel.com'])
+#         owner_email.content_subtype = 'html'
+#         owner_email.send()
+
+#         # Send to Admin
+#         admin_email = EmailMessage(subject, html_message, 'info@rapprel.com', ['admin@rapparel.com'])
+#         admin_email.content_subtype = 'html'
+#         admin_email.send()
+
+#         return Response({'order_id': order.id, 'message': 'Order placed successfully'}, status=status.HTTP_201_CREATED)
+
+class AddToCartView(View):
+    def post(self, request, *args, **kwargs):
+        # Ensure user is authenticated
+        if not request.user.is_authenticated:
+            messages.error(request, "Please log in to add items to your cart.")
+            return redirect('login')  # Redirect to login if not authenticated
+
+        # Retrieve the product ID and quantity from the POST request
+        product_id = request.POST.get('product_id')
+        quantity = int(request.POST.get('quantity', 1))  # Default to 1 if quantity is not provided
+
+        # Get the product and the user's cart
         product = get_object_or_404(Product, id=product_id)
-        store = product.store
         cart, created = Cart.objects.get_or_create(user=request.user)
 
-        if cart.store and cart.store != store:
-            # Empty the cart if the store is different
-            cart.items.clear()
-
-        cart.store = store
+        # Add the product to the cart
         cart_item, created = CartItem.objects.get_or_create(cart=cart, product=product)
-        cart_item.quantity = quantity
+        cart_item.quantity += quantity  # Increment quantity if item already exists
         cart_item.save()
         cart.save()
 
-        return Response({'message': 'Item added to cart successfully'}, status=status.HTTP_200_OK)
 
-class CartPageView(APIView):
-    permission_classes = [AllowAny]  # Allow both authenticated and anonymous users to access
+        # Redirect to cart page or any other page
+        return redirect('cart_checkout')  # Redirect to the cart and checkout page
 
-    def get(self, request, *args, **kwargs):
-        # Check if the user is authenticated
-        if request.user.is_authenticated and not isinstance(request.user, AnonymousUser):
-            # Try to fetch the cart for the authenticated user, or create one if not found
+
+def send_order_confirmation_email(order, cart_items, user_email):
+    # Prepare the email context with order and cart details
+    context = {
+        'order': order,
+        'cart_items': cart_items,
+        'total_amount': order.total_amount,
+        'address': order.address,
+    }
+
+    # Render the HTML email template
+    html_content = render_to_string('emails/order_confirmation.html', context)
+    text_content = strip_tags(html_content)  # Fallback to plain text if HTML is not supported
+
+    # Create the email message
+    subject = f"Order Confirmation - #{order.id}"
+    from_email = settings.DEFAULT_FROM_EMAIL
+    recipient_list = [user_email, settings.ADMIN_EMAIL]
+
+    # Send the email to both user and admin
+    email = EmailMultiAlternatives(subject, text_content, from_email, recipient_list)
+    email.attach_alternative(html_content, "text/html")
+    email.send()
+
+
+
+class CartCheckoutView(View):
+    def get(self, request):
+        # Retrieve the cart for the user
+        if request.user.is_authenticated:
             cart, created = Cart.objects.get_or_create(user=request.user)
+            cart_items = CartItem.objects.filter(cart=cart)
+            addresses = Address.objects.filter(user=request.user)
 
-            # If the cart is newly created, return an empty cart message
-            if created:
-                return Response({'message': 'Cart was created. It is currently empty.'}, status=status.HTTP_200_OK)
+            # Calculate total price of the cart items
+            total_price = sum(item.product.sale_price * item.quantity for item in cart_items)
+            
+            # Dummy discount logic (e.g., fixed discount or based on cart value)
+            discount = 0
+            # if total_price > 1000:  # Apply discount if cart total is more than ₹1000
+            #     discount = 100  # Apply ₹100 discount
 
-            # If cart already exists, return the cart items and store info
-            items = CartItemSerializer(cart.items.all(), many=True).data
-            store = StoreSerializer(cart.store).data if cart.store else None
-            return Response({'store': store, 'items': items}, status=status.HTTP_200_OK)
-        
-        # Handle anonymous users
-        return Response({'message': 'Please log in to view your cart.'}, status=status.HTTP_401_UNAUTHORIZED)
+            # Delivery charges (you can adjust based on your business logic)
+            if cart_items.exists():
+                delivery_charges = 100 if total_price < 500 else 0  # Apply delivery charges if total is less than ₹500
+            else:
+                delivery_charges = 0
+            # Final total amount after applying discount and adding delivery charges
+            total_amount = total_price - discount + delivery_charges
 
+            context = {
+                'cart_items': cart_items,
+                'addresses': addresses,
+                'cart': cart,
+                'discount': discount,
+                'delivery_charges': delivery_charges,
+                'total_price': total_price,
+                'total_amount': total_amount,
+            }
 
+            return render(request, 'cart_checkout.html', context)
 
-#checkout page view
-class CheckoutPageView(APIView):
-    # permission_classes = [IsAuthenticated]
-    permission_classes = [AllowAny]
+        else:
+            cart_items = []
+            addresses = []
 
-    def get(self, request, *args, **kwargs):
-        try:
-            cart = Cart.objects.get(user=request.user)
-        except Cart.DoesNotExist:
-            return Response({'detail': 'Cart is empty.'}, status=status.HTTP_404_NOT_FOUND)
+            return render(request, 'cart_checkout.html', {
+                'cart_items': cart_items,
+                'addresses': addresses,
+            })
+    
+    def post(self, request):
+        # Proceed to checkout
+        address_id = request.POST.get('address_id')
+        payment_method = request.POST.get('payment_method')
 
-        addresses = Address.objects.filter(user=request.user)
-        address_serializer = AddressSerializer(addresses, many=True)
-        cart_serializer = CartSerializer(cart)
-
-        data = {
-            'cart': cart_serializer.data,
-            'addresses': address_serializer.data,
-        }
-        return Response(data, status=status.HTTP_200_OK)
-
-    def post(self, request, *args, **kwargs):
         cart = Cart.objects.get(user=request.user)
-        address_id = request.data.get('address_id')
-        payment_method = request.data.get('payment_method')
+        cart_items = CartItem.objects.filter(cart=cart)
+        if not cart_items.exists():
+            return redirect('cart_checkout')
 
-        if not cart.items.exists():
-            return Response({'error': 'Your cart is empty'}, status=status.HTTP_400_BAD_REQUEST)
+        address = get_object_or_404(Address, id=address_id, user=request.user)
 
-        try:
-            address = Address.objects.get(id=address_id, user=request.user)
-        except Address.DoesNotExist:
-            return Response({'error': 'Invalid address'}, status=status.HTTP_400_BAD_REQUEST)
-
-        total_amount = sum(item.product.sale_price * item.quantity for item in cart.items.all())
+        total_amount = sum(item.product.sale_price * item.quantity for item in cart_items)
 
         # Create the order
         order = Order.objects.create(
@@ -776,35 +949,282 @@ class CheckoutPageView(APIView):
                 price=item.product.sale_price,
             )
 
-        # Clear the cart after order creation
-        cart.items.all().delete()
+        # Clear the cart
+        cart_items.all().delete()
 
-        # Send Invoice Email
-        subject = f"Invoice for Order #{order.id}"
-        context = {
-            'order': order,
-            'user': request.user,
-            'logo_url': 'https://rapparel.com/static/logo.png',  # replace with actual logo URL
-        }
+        # Send email and other order processing tasks
+        send_order_confirmation_email(order, cart_items, request.user.email)
 
-        html_message = render_to_string('invoice_email.html', context)
-        plain_message = strip_tags(html_message)
 
-        customer_email = EmailMessage(subject, html_message, 'info@rapprel.com', [request.user.email])
-        customer_email.content_subtype = 'html'
-        customer_email.send()
+        return redirect('order_success', order_id=order.id)
 
-        # Send to Owner
-        owner_email = EmailMessage(subject, html_message, 'info@rapprel.com', ['owner@rapprel.com'])
-        owner_email.content_subtype = 'html'
-        owner_email.send()
 
-        # Send to Admin
-        admin_email = EmailMessage(subject, html_message, 'info@rapprel.com', ['admin@rapparel.com'])
-        admin_email.content_subtype = 'html'
-        admin_email.send()
 
-        return Response({'order_id': order.id, 'message': 'Order placed successfully'}, status=status.HTTP_201_CREATED)
+# class UpdateCartItemView(View):
+#     def post(self, request, *args, **kwargs):
+#         if not request.user.is_authenticated:
+#             return JsonResponse({'error': 'You must be logged in to update the cart.'}, status=403)
+
+#         cart_item_id = request.POST.get('cart_item_id')
+#         new_quantity = int(request.POST.get('quantity'))
+
+#         # Get the cart item and update its quantity
+#         cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__user=request.user)
+#         cart_item.quantity = new_quantity
+#         cart_item.save()
+
+#         # Recalculate cart totals
+#         cart = cart_item.cart
+#         total_price = sum(item.product.sale_price * item.quantity for item in CartItem.objects.filter(cart=cart))
+#         discount = 0
+#         # if total_price > 1000:
+#         #     discount = 100  # Example discount logic
+#         delivery_charges = 100 if total_price < 500 else 0
+#         total_amount = total_price - discount + delivery_charges
+
+#         # Return updated cart data in JSON format
+#         return JsonResponse({
+#             'total_price': total_price,
+#             'discount': discount,
+#             'delivery_charges': delivery_charges,
+#             'total_amount': total_amount,
+#         })
+
+
+@login_required
+def update_or_delete_cart_item(request):
+    if request.method == 'POST':
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return JsonResponse({'error': 'You must be logged in to update the cart.'}, status=403)
+
+        # Get the cart item ID and action from the POST request
+        cart_item_id = request.POST.get('cart_item_id')
+        action = request.POST.get('action')  # Action: either 'update' or 'delete'
+
+        # Get the cart item and ensure it belongs to the current user's cart
+        cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__user=request.user)
+        cart = cart_item.cart
+
+        if action == 'update':
+            print('update')
+            # Update quantity
+            try:
+                new_quantity = int(request.POST.get('quantity'))
+                cart_item.quantity = new_quantity
+                cart_item.save()
+            except (ValueError, TypeError):
+                return JsonResponse({'error': 'Invalid quantity provided.'}, status=400)
+
+        elif action == 'delete':
+            print('here')
+            # Delete the cart item
+            cart_item.delete()
+        else:
+            return JsonResponse({'error': 'Invalid action provided.'}, status=400)
+
+        # Recalculate cart totals after update/delete
+        total_price = sum(item.product.sale_price * item.quantity for item in CartItem.objects.filter(cart=cart))
+        discount = 0
+        # if total_price > 1000:
+        #     discount = 100  # Example discount logic
+        delivery_charges = 100 if total_price < 500 else 0
+        total_amount = total_price - discount + delivery_charges
+
+        # Return updated cart data in JSON format
+        return JsonResponse({
+            'total_price': total_price,
+            'discount': discount,
+            'delivery_charges': delivery_charges,
+            'total_amount': total_amount,
+        })
+    
+    return JsonResponse({'error': 'Invalid request method.'}, status=405)
+
+
+@login_required
+def delete_cart_item(request):
+    if request.method == 'POST':
+        # Get cart item ID from the request
+        cart_item_id = request.POST.get('cart_item_id')
+
+        # Get the cart item and ensure it belongs to the current user's cart
+        cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__user=request.user)
+        cart = cart_item.cart
+
+        # Delete the cart item
+        cart_item.delete()
+
+        # Update the cart totals
+        total_price = sum(item.product.sale_price * item.quantity for item in CartItem.objects.filter(cart=cart))
+
+        # Optionally apply discount or delivery charges logic here
+        discount = 100 if total_price > 1000 else 0
+        delivery_charges = 100 if total_price < 500 else 0
+        total_amount = total_price - discount + delivery_charges
+
+        # Return updated cart totals as JSON response
+        return JsonResponse({
+            'total_price': total_price,
+            'discount': discount,
+            'delivery_charges': delivery_charges,
+            'total_amount': total_amount
+        })
+    
+    # If not POST request, return error or redirect
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+
+@login_required
+@require_POST
+def add_address(request):
+    if request.method == 'POST':
+        street_address = request.POST.get('street_address')
+        city = request.POST.get('city')
+        state = request.POST.get('state')
+        postal_code = request.POST.get('postal_code')
+        country = request.POST.get('country')
+
+        # Save the new address
+        address = Address.objects.create(
+            user=request.user,
+            street_address=street_address,
+            city=city,
+            state=state,
+            postal_code=postal_code,
+            country=country
+        )
+        addresses = Address.objects.filter(user=request.user)
+        # Return a JSON response with the new address data
+        return JsonResponse({
+            'addresses' : True,
+            'id': str(address.id),
+            'street_address': address.street_address,
+            'city': address.city,
+            'state': address.state,
+            'postal_code': address.postal_code,
+            'country': address.country
+        })
+    
+
+
+class ApplyCouponView(View):
+
+    def post(self, request, *args, **kwargs):
+        code = request.POST.get('code')  # Get the coupon code from the POST data
+        total_price = float(request.POST.get('total_price'))  # Get total price from POST data
+        delivery_charges = float(request.POST.get('delivery_charges'))  # Get delivery charges from POST data
+        discount_amount = 0.00  # Initially no discount
+
+        try:
+            # Retrieve the coupon by code and ensure it's active
+            coupon = get_object_or_404(Coupon, code=code, is_active=True)
+
+            # Check if coupon is within valid date range
+            if not (coupon.valid_from <= timezone.now() <= coupon.valid_until):
+                return JsonResponse({'error': 'Coupon is expired'}, status=400)
+
+            # Check if minimum spend requirement is met
+            if coupon.minimum_spend and total_price < coupon.minimum_spend:
+                return JsonResponse({'error': f'Minimum spend of ₹ {coupon.minimum_spend} is required'}, status=400)
+
+            # Calculate the discount
+            discount_amount = (coupon.discount_percentage / 100) * total_price
+            if discount_amount > coupon.max_discount_amount:
+                discount_amount = coupon.max_discount_amount
+
+            # Calculate the new total price after applying the coupon
+            new_total_price = total_price - discount_amount
+            total_amount = new_total_price + delivery_charges
+
+            return JsonResponse({
+                'success': True,
+                'new_total_price': round(new_total_price, 2),
+                'discount_amount': round(discount_amount, 2),
+                'total_amount': round(total_amount, 2)
+            })
+
+        except Coupon.DoesNotExist:
+            return JsonResponse({'error': 'Invalid coupon code'}, status=400)
+
+
+
+
+# @csrf_exempt  # CSRF exemption for simplicity in AJAX calls, ensure security in production
+@login_required
+def place_order_ajax(request):
+    if request.method == 'POST':
+        try:
+            user = request.user
+            address_id = request.POST.get('address_id')
+            total_amount = request.POST.get('total_amount')
+            address = get_object_or_404(Address, id=address_id, user=user)
+
+            # Get user details from the form
+            full_name = request.POST.get('full_name')
+            email = request.POST.get('email')
+            phone_number = request.POST.get('phone_number')
+
+            # Get the cart and calculate the total amount
+            cart = Cart.objects.get(user=user)
+            cart_items = CartItem.objects.filter(cart=cart)
+            # total_amount = sum(item.product.sale_price * item.quantity for item in cart_items)
+            # delivery_charges = 50.00  # Example delivery charges
+            # total_amount += delivery_charges
+            if not cart_items.exists():
+                return JsonResponse({'error': 'Your cart is empty.'}, status=400)
+            # Create the order
+            order = Order.objects.create(
+                user=user,
+                full_name=full_name,
+                email=email,
+                phone_number=phone_number,
+                street_address=address.street_address,
+                city=address.city,
+                state=address.state,
+                pin_code=address.postal_code,
+                country=address.country,
+                total_amount=total_amount,
+                order_status='pending',
+                payment_status='Pending'
+            )
+
+            # Create order items
+            for item in cart_items:
+                OrderItem.objects.create(
+                    order=order,
+                    product=item.product,
+                    quantity=item.quantity,
+                    price=item.product.sale_price
+                )
+
+            # Clear the cart after order is placed
+            cart_items.delete()
+
+            return JsonResponse({'success': True, 'message': 'Order placed successfully!', 'order_id': str(order.id)})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)}, status=400)
+
+    return JsonResponse({'success': False, 'message': 'Invalid request'}, status=400)
+
+
+
+@login_required
+def order_confirmation(request, order_id):
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+    return render(request, 'order_confirmation.html', {'order': order})
+
+
+
+
+
+
+
+
+
+
+
+
 
 #for previous orders
 class OrderDetailView(APIView):
@@ -991,7 +1411,7 @@ def login_view(request):
             login(request, user)
             if (login):
                 print(True)
-            return redirect('home')  # Redirect to homepage or any protected page
+            return redirect('landing_page')  # Redirect to homepage or any protected page
         else:
             # If authentication fails, show an error message
             messages.error(request, 'Invalid email or password.')
@@ -1031,6 +1451,54 @@ class PasswordResetView(FormView):
             form.save(**opts)
 
         return super().form_valid(form)
+
+
+
+@login_required
+def edit_account(request):
+    user = request.user
+
+    # Get the user's group (role)
+    user_groups = user.groups.all()
+    user_role = user_groups[0].name if user_groups.exists() else 'No Role Assigned'
+
+    if request.method == 'POST':
+        # Get the submitted data
+        email = request.POST.get('email')
+        phone_number = request.POST.get('phone_number')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+
+        # Validate data (you can add more validation logic here)
+        if not email or not phone_number or not first_name or not last_name:
+            messages.error(request, 'All fields are required.')
+            return render(request, 'myaccount.html', {'user': user, 'user_role': user_role})
+
+        try:
+            # Update user details
+            user.email = email
+            user.phone_number = phone_number
+            user.first_name = first_name
+            user.last_name = last_name
+            user.save()
+
+            messages.success(request, 'Your account details were updated successfully!')
+            return redirect('edit_account')
+        
+        except IntegrityError:
+            # Handle the duplicate email error
+            messages.error(request, 'This email is already registered with another account.')
+            return render(request, 'myaccount.html', {'user': user, 'user_role': user_role})
+
+    return render(request, 'myaccount.html', {'user': user, 'user_role': user_role})
+
+
+
+
+
+
+
+
 
 
 
@@ -1301,17 +1769,17 @@ class CouponDetailView(APIView):
 
 
 #for apply coupon button for user (cart page or checkout page)
-class ApplyCouponView(APIView):
-    permission_classes = [IsAuthenticated]
+# class ApplyCouponView(APIView):
+#     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        coupon_code = request.data.get('coupon_code')
-        cart = Cart.objects.get(user=request.user)
-        success, message = cart.apply_coupon(coupon_code)
-        if success:
-            return Response({"message": message})
-        else:
-            return Response({"error": message}, status=400)
+#     def post(self, request):
+#         coupon_code = request.data.get('coupon_code')
+#         cart = Cart.objects.get(user=request.user)
+#         success, message = cart.apply_coupon(coupon_code)
+#         if success:
+#             return Response({"message": message})
+#         else:
+#             return Response({"error": message}, status=400)
         
 
 #done

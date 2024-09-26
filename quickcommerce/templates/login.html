@@ -16,12 +16,13 @@
         </div>
 
         <!-- Password Input -->
-        <div class="password-field mb-3">
-           
+        <div class="mb-3">
+           <div class="input-group">
             <input type="password" id="password" name="password" class="form-control" placeholder="Password" required>
             <span class="input-group-text" onclick="togglePassword()">
                 <i class="bi bi-eye" id="togglePasswordIcon"></i>
             </span>
+        </div>
         </div>
         <div class="mb-3 text-end">
             <a href="{% url 'password_reset' %}" class="text-danger">Forgot Password?</a>

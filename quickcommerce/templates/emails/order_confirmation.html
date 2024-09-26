@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h2 class="my-4">Thank you for your order!</h2>
+
+        <p>Hello {{ order.user.first_name }},</p>
+        <p>We are processing your order and will notify you once it ships.</p>
+
+        <h4>Order Details</h4>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in cart_items %}
+                <tr>
+                    <td>{{ item.product.name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>₹ {{ item.product.sale_price }}</td>
+                    <td>₹ {{ item.quantity|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3" class="text-end"><strong>Total Amount</strong></td>
+                    <td><strong>₹ {{ total_amount|floatformat:2 }}</strong></td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <h4>Shipping Address</h4>
+        <p>
+            {{ address.street }}<br>
+            {{ address.city }}<br>
+            {{ address.state }} - {{ address.zip_code }}<br>
+            {{ address.country }}
+        </p>
+
+        <p>If you have any questions, feel free to contact us at {{ settings.SUPPORT_EMAIL }}.</p>
+        <p>Best regards,<br>Your Company Name</p>
+    </div>
+</body>
+</html>

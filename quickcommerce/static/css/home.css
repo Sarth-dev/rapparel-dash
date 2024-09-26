@@ -7,6 +7,11 @@
         padding-right: 5rem;
         max-width: 100%; /* You can control the max width if needed */
       }
+
+      #bannerdiv{
+         padding: 0px;
+        }
+        
       
       h1{
         font-size: 3.5rem;
@@ -134,7 +139,23 @@
         margin-left: 10px;
       }
           
-          
+          /* new */
+      /* #location-input-desktop {
+        width: 400px !important;
+         border-top-left-radius: 0;
+        border-top-right-radius: 20px;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 20px;
+        }
+       .location{
+         border-top-left-radius: 20px;
+        border-top-right-radius: 0;
+        border-bottom-left-radius: 20px;
+         border-bottom-right-radius: 0;
+       } */
+       #search-form {
+        display: none !important;
+    }
       
       /* Font icon size and color change on hover */
       .navbar .bi {

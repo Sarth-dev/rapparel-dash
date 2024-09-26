@@ -15,9 +15,9 @@ urlpatterns = [
 
     #frontend urls for user
     # path('api/landing/', LandingPageView.as_view(), name='landing-page'),
-    path('api/cart/', CartPageView.as_view(), name='cart-page'),
-    path('api/cart/add/', AddToCartView.as_view(), name='add-to-cart'),
-    path('api/checkout/', CheckoutPageView.as_view(), name='checkout-page'),
+    # path('api/cart/', CartPageView.as_view(), name='cart-page'),
+    # path('api/cart/add/', AddToCartView.as_view(), name='add-to-cart'),
+    # path('api/checkout/', CheckoutPageView.as_view(), name='checkout-page'),
     path('order/<uuid:order_id>/', OrderDetailView.as_view(), name='order-detail'),
     # path('signup/', SignupView.as_view(), name='signup'),
     # path('login/', LoginView.as_view(), name='login'),
@@ -44,7 +44,7 @@ urlpatterns = [
     # path('api/media/', MediaPageView.as_view(), name='media_list'),
     # path('api/banners/', BannerView.as_view(), name='banner_list'),
     # path('api/banners/<uuid:pk>/', BannerView.as_view(), name='banner_detail'),
-    path('cart/apply-coupon/', ApplyCouponView.as_view(), name='apply-coupon'),
+    # path('cart/apply-coupon/', apply_coupon, name='apply-coupon'),
 
     # path('api/users/customers/', CustomerListView.as_view(), name='customer_list'),
     # path('products/', ProductListView.as_view(), name='product-list'),
@@ -94,6 +94,18 @@ urlpatterns = [
     path('wishlist/add/<slug:product_slug>/', add_to_wishlist, name='add_to_wishlist'),  # Add to wishlist
     path('wishlist/remove/<slug:product_slug>/', remove_from_wishlist, name='remove_from_wishlist'),  # Remove from wishlist
     path('search/', search_products, name='search_products'),  # URL for product search
+    path('add-to-cart/', AddToCartView.as_view(), name='add_to_cart'),  #for add to cart
+    path('checkout/', CartCheckoutView.as_view(), name='cart_checkout'), #for cart and checkout page
+    path('update-cart-item/', update_or_delete_cart_item, name='update_cart_item'),
+    path('delete-cart-item/', delete_cart_item, name='delete_cart_item'),  
+    path('add-address/', add_address, name='add_address'),
+    path('apply-coupon/', ApplyCouponView.as_view(), name='apply_coupon'),
+    path('place-order-ajax/', place_order_ajax, name='place_order_ajax'),
+    path('order-confirmation/<uuid:order_id>/', order_confirmation, name='order_confirmation'),
+    path('myaccount/', edit_account, name='edit_account'),
+
+
+
 
 
 

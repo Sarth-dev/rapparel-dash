@@ -11,6 +11,14 @@
   {% load static %}
   <link rel="stylesheet" href="{% static 'css/home.css' %}">
   {% block extra_css %}
+
+ <style>
+ @media(max-width:760px){
+        .container-fluid{
+            margin-top: 11rem !important;
+        }
+    }
+ </style>
   <!-- Additional CSS goes here -->
   {% endblock %}
 </head>
@@ -106,9 +114,9 @@
         <!-- Search results will be dynamically inserted here -->
     </div>
       
-      <a href="#" class="mr-3"><i class="bi bi-heart"></i></a>
-      <a href="#" class="mr-3"><i class="bi bi-bag"></i></a>
-      <a href="#"><i class="bi bi-person-circle"></i></a>
+      <a href="/wishlist/" class="mr-3"><i class="bi bi-heart"></i></a>
+      <a href="/checkout/" class="mr-3"><i class="bi bi-bag"></i></a>
+      <a href="/myaccount/"><i class="bi bi-person-circle"></i></a>
     </div>
   </nav>
 
@@ -175,19 +183,19 @@
   <!-- Bottom Navigation Bar for Mobile -->
 <nav id="bottom-nav" class="navbar fixed-bottom navbar-light bg-light">
     <div class="d-flex justify-content-around w-100">
-      <a href="#" class="nav-item text-center">
+      <a href="/" class="nav-item text-center">
         <i class="bi bi-house-door" style="font-size: 1.5rem;"></i>
         <p>Home</p>
       </a>
-      <a href="#" class="nav-item text-center">
+      <a href="/checkout/" class="nav-item text-center">
         <i class="bi bi-bag" style="font-size: 1.5rem;"></i>
-        <p>Cart</p>
+        <p>Bag</p>
       </a>
-      <a href="#" class="nav-item text-center">
+      <a href="/myaccount/" class="nav-item text-center">
         <i class="bi bi-person-circle" style="font-size: 1.5rem;"></i>
         <p>Account</p>
       </a>
-      <a href="#" class="nav-item text-center">
+      <a href="/wishlist/" class="nav-item text-center">
         <i class="bi bi-heart" style="font-size: 1.5rem;"></i>
         <p>Wishlist</p>
       </a>

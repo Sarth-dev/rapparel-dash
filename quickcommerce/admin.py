@@ -16,7 +16,10 @@ from django.template.response import TemplateResponse
 from .models import *
 import pandas as pd
 
-
+# Change the default Django Admin text
+admin.site.site_header = "Rapparel Administration"
+admin.site.site_title = "Rapparel Admin Portal"
+admin.site.index_title = "Welcome to Rapparel Admin Dashboard"
 # class ProductAdmin(admin.ModelAdmin):
 #     list_display = ('name', 'display_image', 'gallery_link')
 #     readonly_fields = ('display_image',)

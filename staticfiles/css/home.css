@@ -7,6 +7,11 @@
         padding-right: 5rem;
         max-width: 100%; /* You can control the max width if needed */
       }
+
+      #bannerdiv{
+         padding: 0px;
+        }
+        
       
       h1{
         font-size: 3.5rem;
@@ -87,12 +92,13 @@
           
       /* Navbar search bar styling */
       #search-bar {
+        
         width: 500px;  /* Extend the width */
         border-radius: 25px;  /* Make the search bar rounded */
         border: 1px solid #ddd;  /* Subtle border */
         padding: 10px 20px;  /* Add some padding for a better look */
         /* box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);   */
-        background-color: #ccc;
+        background-color: #f5f5f6;
         transition: all 0.3s ease-in-out;  /* Smooth transition for focus effect */
       }
 
@@ -133,7 +139,21 @@
         margin-left: 10px;
       }
           
-          
+          /* new */
+      /* #location-input-desktop {
+        width: 400px !important;
+         border-top-left-radius: 0;
+        border-top-right-radius: 20px;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 20px;
+        }
+       .location{
+         border-top-left-radius: 20px;
+        border-top-right-radius: 0;
+        border-bottom-left-radius: 20px;
+         border-bottom-right-radius: 0;
+       } */
+        
       
       /* Font icon size and color change on hover */
       .navbar .bi {
