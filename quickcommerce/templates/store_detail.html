@@ -73,6 +73,8 @@
  font-size: 0.85rem;
  flex-direction:column;
  }
+ 
+
 
 
       .product-card .wishlist-icon {
@@ -289,7 +291,7 @@
       <div class="tab-pane fade show active" id="all-products" role="tabpanel" aria-labelledby="all-products-tab">
         <div class="row">
           {% for product in products %}
-          <div class="col-lg-4 col-md-6 mb-4 product-card" 
+          <div class="col-lg-4 col-md-6 mb-4 d-flex product-card" 
                data-category="{{ product.category.id }}" 
                data-price="{{ product.sale_price }}"
                data-attributes="{{ product.attributes.all|join:',' }}">
@@ -303,7 +305,13 @@
                     <form action="{% url 'add_to_cart' %}" method="POST">
                       {% csrf_token %}
                       <input type="hidden" name="product_id" value="{{ product.id }}">
-                      <button class="btn btn-block">Add to Bag</button>
+                      <button class="btn btn-block">Add to Cart</button>
+                      <button class="btn btn-block">Buy Now</button>
+                      <!-- <div class="d-flex mt-0" style="gap: 18px;">
+                        <button class="btn btn-block mt-0 ">Buy Now</button>
+                      </div> -->
+                    </div>
+  
                     </form>
                   </div>
                 </div>

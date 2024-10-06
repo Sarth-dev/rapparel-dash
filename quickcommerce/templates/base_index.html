@@ -37,12 +37,12 @@
         <form class="form-inline" id="location-form">
           <div class="input-group">
             <div class="input-group-prepend">
-              <span class="input-group-text text-sm" id="location-icon">
+              <span class="input-group-text text-sm locicon" id="location-icon">
                 <i class="bi bi-geo-alt-fill"></i>
               </span>
             </div>
           <!-- Input for manual address typing or displaying detected location -->
-          <input id="location-input" class="form-control mr-sm-2" type="search" placeholder="Detecting location..." aria-label="Location">
+          <input id="location-input" class="form-control mr-sm-2 locicon" type="search" placeholder="Detecting location..." aria-label="Location">
         </div>
 
           <!-- Dropdown for saved addresses (hidden by default) -->
@@ -80,12 +80,12 @@
       <form class="form-inline" id="location-form">
         <div class="input-group">
           <div class="input-group-prepend">
-            <span class="input-group-text text-sm" id="location-icon-desktop">
+            <span class="input-group-text text-sm locicon" id="location-icon-desktop">
               <i class="bi bi-geo-alt-fill"></i>
             </span>
           </div>
           <!-- Input for manual address typing or displaying detected location -->
-          <input id="location-input-desktop" class="form-control mr-sm-2" type="search" placeholder="Detecting location..." aria-label="Location">
+          <input id="location-input-desktop" class="form-control mr-sm-2 locicon" type="search" placeholder="Detecting location..." aria-label="Location">
         </div>
         <!-- Input for manual address typing or displaying detected location -->
       
@@ -121,7 +121,7 @@
   </nav>
 
   <!-- Main content block -->
-  <div class="container-fluid">
+  <div id="tabmain" class="container-fluid">
     {% block content %}
     <!-- This block will be replaced with page-specific content -->
     {% endblock %}
@@ -130,7 +130,7 @@
   <!-- Footer -->
   <footer class="bg-light text-justify text-lg-start">
     <div class="container p-4">
-      <div class="row">
+      <div class="row d-flex justify-content-between">
         <div class="col-lg-3 col-md-6 mb-4">
           <img src="{%  static 'img/logo.svg'  %}" alt="Rapparel Logo" width="100" height="100">
           <p class="mt-3">

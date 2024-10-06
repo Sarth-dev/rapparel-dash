@@ -10,6 +10,7 @@ Home - Rapparel
   <div class="hero-section position-relative content-container mt-4">
     {% if primary_banner %}
       <img src="{{ primary_banner.image.url }}" alt="Banner" class="img-fluid">
+      <!-- <img src="/media/banners/kartik-iyer-DJ4vjcD0s0I-unsplash.jpg" alt="Banner" class="img-fluid"> -->
       <div class="carousel-caption">
         <h1>{{ primary_banner.title }}</h1>
         <p>{{ primary_banner.tagline }}</p>
@@ -73,6 +74,7 @@ Home - Rapparel
         <div class="carousel-item {% if forloop.first %}active{% endif %}">
           <a href="{{ banner.link }}">
             <img src="{{ banner.image.url }}" class="d-block w-100" alt="{{ banner.title }}">
+           
         </a>
         </div>
       {% endfor %}
