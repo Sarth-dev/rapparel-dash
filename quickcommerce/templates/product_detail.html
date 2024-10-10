@@ -9,6 +9,11 @@
         display: flex;
         justify-content: space-between;
     }
+    @media (max-width: 768px) {
+        .row{
+            margin-top: 131px;
+        }
+    }
 
     .product-main-image-wrapper {
         width: 100%; /* Increased width for better alignment */
@@ -237,11 +242,13 @@
                     <input type="hidden" name="product_id" value="{{ product.id }}">
 
                     <!-- Quantity input and Add to Bag button side by side -->
-                    <div class="input-group me-2" style="max-width: 1000px; width: 90%;">
-                        <input type="number" name="quantity" value="1" class="form-control" min="1">
+                    <div class="d-flex gap-[10px] w-[100%]">
+                        <div class="input-group me-2 " style="max-width: 1000px; width: 90%;">
+                            <input type="number" name="quantity" value="1" class="form-control" min="1">
+                        </div>
+                        <button type="submit" class="btn btn-danger" style="width: 360px;">Add to Bag</button>
+    
                     </div>
-
-                    <button type="submit" class="btn btn-danger" style="width: 500px;">Add to Bag</button>
                 </form>
             </div>
 

@@ -113,6 +113,7 @@
 
       .navbar{
         box-shadow: rgba(0, 0, 0, 0.1) 0px 10px 5px;
+        width: 100% !important;
       }
       /* Detect Location button inlined */
       #location-form {
@@ -243,6 +244,9 @@
           padding-left: 3rem;
           padding-right: 3rem;
         }
+        .navbar{
+          width: 100%;
+        }
       }
       
       @media (max-width: 992px) {
@@ -251,6 +255,9 @@
         margin-right: 0rem !important;
           padding-left: 1rem !important;
           padding-right: 1rem !important;
+        }
+        .navbar{
+          width: 100%;
         }
         
         /* Hero Section Adjustments */
@@ -268,6 +275,9 @@
         /* Adjust the navbar */
         .navbar .d-flex {
           display: none; /* Hide the icons (heart, bag, profile) */
+        }
+        .navbar{
+          width: 100% !important;
         }
         
        
@@ -315,6 +325,7 @@
         /* Further adjust for extra small screens */
         .navbar {
           flex-direction: row;
+          width: 100%;
         }
       
         /* Further adjustments for hero section */
@@ -401,6 +412,7 @@
         }
         .mobile-nav {
           display: flex !important;
+          width: 100%;
          /* Show the mobile header on small devices */
         }
       #location-input, #location-select {
